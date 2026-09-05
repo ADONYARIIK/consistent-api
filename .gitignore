@@ -1,0 +1,32 @@
+/vendor/
+/composer.lock
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.fleet/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PHP / testing / tooling
+.phpunit.result.cache
+.phpunit.cache/
+.php-cs-fixer.cache
+.phpstan.cache
+psalm.xml
+coverage/
+.php_cs.cache
+auth.json
+*.log
