@@ -5,7 +5,7 @@ Laravel toolkit for lean, consistent REST APIs: modular route structure, CRUD co
 | Requirement | Version |
 |---|---|
 | PHP | `^8.1` |
-| Laravel | `^10` / `^11` / `^12` |
+| Laravel | `^10` / `^11` / `^12` / `^13` |
 
 Package: `adonyarik/consistent-api`  
 Namespace: `Adonyarik\ConsistentApi`
