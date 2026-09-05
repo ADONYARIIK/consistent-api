@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Adonyarik\ConsistentApi\Controllers;
 
 use Adonyarik\ConsistentApi\Contracts\WithoutPaginationModelContract;
-use Adonyarik\ConsistentApi\Models\CrudModel;
+use Illuminate\Database\Eloquent\Model;
 use Adonyarik\ConsistentApi\Requests\BaseSearchRequest;
 use Adonyarik\ConsistentApi\Responses\PaginatedJsonResponse;
 use Illuminate\Database\Eloquent\Builder;
@@ -24,7 +24,7 @@ class CrudController extends Controller
      */
     protected array $relationFunctions = [];
 
-    public function indexLogic(BaseSearchRequest $request, CrudModel $model): JsonResponse
+    public function indexLogic(BaseSearchRequest $request, Model $model): JsonResponse
     {
         $filters = $request->safe()->except('id');
 
@@ -35,7 +35,6 @@ class CrudController extends Controller
                 config('pagination.data_container_name') => $this->resourceClass::collection($query->get())->resolve($request),
             ]);
         }
-
         $items = $query->paginate($request->input('perpage'));
 
         return new PaginatedJsonResponse(
@@ -44,7 +43,7 @@ class CrudController extends Controller
         );
     }
 
-    public function selectLogic(CrudModel $model): JsonResource
+    public function selectLogic(Model $model): JsonResource
     {
         foreach ($this->relationFunctions as $relationFunction) {
             $model->load($relationFunction);
@@ -53,14 +52,14 @@ class CrudController extends Controller
         return new $this->resourceClass($model);
     }
 
-    public function storeLogic(FormRequest $request, CrudModel $model): JsonResponse
+    public function storeLogic(FormRequest $request, Model $model): JsonResponse
     {
         return $this->saveModel($request->validated(), $model)
             ->response($request)
             ->setStatusCode(JsonResponse::HTTP_CREATED);
     }
 
-    public function updateLogic(FormRequest $request, CrudModel $model): JsonResource
+    public function updateLogic(FormRequest $request, Model $model): JsonResource
     {
         $model->fill($request->validated())->save();
 
@@ -71,14 +70,14 @@ class CrudController extends Controller
         return new $this->resourceClass($model);
     }
 
-    public function destroyLogic(CrudModel $model): JsonResponse
+    public function destroyLogic(Model $model): JsonResponse
     {
         $model->delete();
 
         return new JsonResponse(status: JsonResponse::HTTP_NO_CONTENT);
     }
 
-    private function saveModel(array $data, CrudModel $model): JsonResource
+    private function saveModel(array $data, Model $model): JsonResource
     {
         $item = $model::create($data);
 
@@ -89,7 +88,7 @@ class CrudController extends Controller
         return new $this->resourceClass($item);
     }
 
-    private function buildFilterSortQuery(array $filters, CrudModel $model): Builder
+    private function buildFilterSortQuery(array $filters, Model $model): Builder
     {
         $query = $model::query();
 
