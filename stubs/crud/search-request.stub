@@ -1,0 +1,18 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }}\Requests;
+
+use Adonyarik\ConsistentApi\Requests\BaseSearchRequest;
+
+class {{ model }}SearchRequest extends BaseSearchRequest
+{
+    /**
+     * @return array<string, mixed>
+     */
+    public function rules(): array
+    {
+        return parent::rules();
+    }
+}

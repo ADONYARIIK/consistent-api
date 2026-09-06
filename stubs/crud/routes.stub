@@ -1,0 +1,12 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Support\Facades\Route;
+use {{ namespace }}\Controllers\{{ model }}Controller;
+
+Route::get('{{ route }}', [{{ model }}Controller::class, 'index'])->name('{{ route }}.index');
+Route::get('{{ route }}/{{{ param }}}', [{{ model }}Controller::class, 'show'])->whereNumber('{{ param }}')->name('{{ route }}.show');
+Route::post('{{ route }}', [{{ model }}Controller::class, 'store'])->name('{{ route }}.store');
+Route::patch('{{ route }}/{{{ param }}}', [{{ model }}Controller::class, 'update'])->whereNumber('{{ param }}')->name('{{ route }}.update');
+Route::delete('{{ route }}/{{{ param }}}', [{{ model }}Controller::class, 'destroy'])->whereNumber('{{ param }}')->name('{{ route }}.destroy');

@@ -1,0 +1,24 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }}\Models;
+
+use Adonyarik\ConsistentApi\Models\CrudModel;
+
+class {{ model }} extends CrudModel
+{
+    protected $table = '{{ table }}';
+
+    protected $fillable = [
+        //
+    ];
+
+    protected array $filter = [
+        //
+    ];
+
+    protected array $sort = [
+        //
+    ];
+}

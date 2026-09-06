@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Adonyarik\ConsistentApi;
 
+use Adonyarik\ConsistentApi\Console\Commands\CreateCrudCommand;
 use Adonyarik\ConsistentApi\Console\Commands\RebuildCommand;
 use Adonyarik\ConsistentApi\Middleware\ApiJsonMiddleware;
 use Adonyarik\ConsistentApi\Middleware\DebuggerMiddleware;
@@ -49,7 +50,10 @@ class ConsistentApiProvider extends ServiceProvider
         JsonResource::withoutWrapping();
 
         if ($this->app->runningInConsole()) {
-            $this->commands([RebuildCommand::class]);
+            $this->commands([
+                RebuildCommand::class,
+                CreateCrudCommand::class,
+            ]);
         }
     }
 }

@@ -1,0 +1,46 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }}\Controllers;
+
+use Adonyarik\ConsistentApi\Controllers\CrudController;
+use {{ namespace }}\Models\{{ model }};
+use {{ namespace }}\Requests\{{ model }}SearchRequest;
+use {{ namespace }}\Requests\Store{{ model }}Request;
+use {{ namespace }}\Requests\Update{{ model }}Request;
+use {{ namespace }}\Resources\{{ model }}Resource;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class {{ model }}Controller extends CrudController
+{
+    protected string $resourceClass = {{ model }}Resource::class;
+
+    protected array $relationFunctions = [];
+
+    public function index({{ model }}SearchRequest $request): JsonResponse
+    {
+        return $this->indexLogic($request, new {{ model }}());
+    }
+
+    public function show({{ model }} ${{ param }}): JsonResource
+    {
+        return $this->selectLogic(${{ param }});
+    }
+
+    public function store(Store{{ model }}Request $request): JsonResponse
+    {
+        return $this->storeLogic($request, new {{ model }}());
+    }
+
+    public function update(Update{{ model }}Request $request, {{ model }} ${{ param }}): JsonResource
+    {
+        return $this->updateLogic($request, ${{ param }});
+    }
+
+    public function destroy({{ model }} ${{ param }}): JsonResponse
+    {
+        return $this->destroyLogic(${{ param }});
+    }
+}
