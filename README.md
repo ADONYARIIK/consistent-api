@@ -2,32 +2,51 @@
 
 Laravel toolkit for lean, consistent REST APIs: modular route structure, CRUD controller, filtering and sorting, pagination, JSON/multipart middleware, debug responses, and PostgreSQL ENUM helpers.
 
-| Requirement | Version |
-|---|---|
-| PHP | `^8.1` |
-| Laravel | `^10` / `^11` / `^12` / `^13` |
+| Requirement | Version                       |
+| ----------- | ----------------------------- |
+| PHP         | `^8.1`                        |
+| Laravel     | `^10` / `^11` / `^12` / `^13` |
 
-Package: `adonyarik/consistent-api`  
+Package: `adonyarik/consistent-api`
 Namespace: `Adonyarik\ConsistentApi`
 
 ---
 
 ## Table of contents
 
-1. [Installation](#installation)
-2. [Configuration](#configuration)
-3. [Modular structure](#modular-structure)
-4. [Artisan commands](#artisan-commands)
-5. [Models (`CrudModel`)](#models-crudmodel)
-6. [CRUD controller](#crud-controller)
-7. [Search, filters, and sorting](#search-filters-and-sorting)
-8. [Pagination and responses](#pagination-and-responses)
-9. [Middleware](#middleware)
-10. [Debugger](#debugger)
-11. [Route macro `development`](#route-macro-development)
-12. [PostgreSQL ENUM](#postgresql-enum)
-13. [Extra traits](#extra-traits)
-14. [Package structure](#package-structure)
+- [Consistent API](#consistent-api)
+  - [Table of contents](#table-of-contents)
+  - [Installation](#installation)
+  - [Configuration](#configuration)
+    - [`config/consistentapi.php`](#configconsistentapiphp)
+    - [`config/pagination.php`](#configpaginationphp)
+  - [Modular structure](#modular-structure)
+    - [Rate limiting](#rate-limiting)
+  - [Artisan commands](#artisan-commands)
+    - [`consistent:crud`](#consistentcrud)
+    - [`consistent:rebuild`](#consistentrebuild)
+  - [Models (`CrudModel`)](#models-crudmodel)
+    - [Disable pagination for a model](#disable-pagination-for-a-model)
+  - [CRUD controller](#crud-controller)
+    - [Methods](#methods)
+  - [Search, filters, and sorting](#search-filters-and-sorting)
+    - [Request](#request)
+    - [Example request](#example-request)
+    - [Behaviour](#behaviour)
+  - [Pagination and responses](#pagination-and-responses)
+  - [Middleware](#middleware)
+    - [Example usage](#example-usage)
+  - [Debugger](#debugger)
+  - [Route macro `development`](#route-macro-development)
+  - [PostgreSQL ENUM](#postgresql-enum)
+    - [DB macros](#db-macros)
+    - [Blueprint macros](#blueprint-macros)
+  - [Extra traits](#extra-traits)
+    - [`EnumHelpers`](#enumhelpers)
+    - [`Credibility`](#credibility)
+  - [Package structure](#package-structure)
+  - [Quick start checklist](#quick-start-checklist)
+  - [License](#license)
 
 ---
 
@@ -64,13 +83,13 @@ This creates:
 
 ### `config/consistentapi.php`
 
-| Key | Default | Description |
-|---|---|---|
-| `modules_folder` | `Modules` | Modules directory relative to `app/` |
-| `request_limit` | `60` | Max requests per minute for the `api` rate limiter |
-| `api_url_prefix` | `api` | URL prefix for module routes |
-| `middlewares` | `['api']` | Middleware stack applied to module routes |
-| `debugger_enabled` | `env('DEBUGGER_ENABLED', false)` | Enable the debug block in JSON responses |
+| Key                | Default                          | Description                                        |
+| ------------------ | -------------------------------- | -------------------------------------------------- |
+| `modules_folder`   | `Modules`                        | Modules directory relative to `app/`               |
+| `request_limit`    | `60`                             | Max requests per minute for the `api` rate limiter |
+| `api_url_prefix`   | `api`                            | URL prefix for module routes                       |
+| `middlewares`      | `['api']`                        | Middleware stack applied to module routes          |
+| `debugger_enabled` | `env('DEBUGGER_ENABLED', false)` | Enable the debug block in JSON responses           |
 
 Example `.env`:
 
@@ -80,11 +99,11 @@ DEBUGGER_ENABLED=true
 
 ### `config/pagination.php`
 
-| Key | Default | Description |
-|---|---|---|
-| `data_container_name` | `items` | Data array key in the response |
-| `meta_container_name` | `meta` | Pagination metadata key |
-| `per_page` | `sm/default/md/lg/xl` → `10/15/25/50/100` | Allowed `perpage` values |
+| Key                   | Default                                   | Description                    |
+| --------------------- | ----------------------------------------- | ------------------------------ |
+| `data_container_name` | `items`                                   | Data array key in the response |
+| `meta_container_name` | `meta`                                    | Pagination metadata key        |
+| `per_page`            | `sm/default/md/lg/xl` → `10/15/25/50/100` | Allowed `perpage` values       |
 
 ---
 
@@ -139,10 +158,10 @@ This may override your application's default `api` limiter. Adjust `request_limi
 
 Both commands use the `consistent:{action}` naming format.
 
-| Command | Purpose |
-|---|---|
-| `php artisan consistent:crud {model}` | Scaffold a full CRUD module |
-| `php artisan consistent:rebuild` | Move existing Laravel API classes into modules |
+| Command                               | Purpose                                        |
+| ------------------------------------- | ---------------------------------------------- |
+| `php artisan consistent:crud {model}` | Scaffold a full CRUD module                    |
+| `php artisan consistent:rebuild`      | Move existing Laravel API classes into modules |
 
 ### `consistent:crud`
 
@@ -290,13 +309,13 @@ class PostController extends CrudController
 
 ### Methods
 
-| Method | Purpose | Response |
-|---|---|---|
-| `indexLogic` | List + filter/sort/paginate | `PaginatedJsonResponse` or non-paginated JSON |
-| `selectLogic` | Single record | `JsonResource` |
-| `storeLogic` | Create | `201` + resource |
-| `updateLogic` | Update | `JsonResource` |
-| `destroyLogic` | Delete | `204 No Content` |
+| Method         | Purpose                     | Response                                      |
+| -------------- | --------------------------- | --------------------------------------------- |
+| `indexLogic`   | List + filter/sort/paginate | `PaginatedJsonResponse` or non-paginated JSON |
+| `selectLogic`  | Single record               | `JsonResource`                                |
+| `storeLogic`   | Create                      | `201` + resource                              |
+| `updateLogic`  | Update                      | `JsonResource`                                |
+| `destroyLogic` | Delete                      | `204 No Content`                              |
 
 Models passed into these methods must extend `CrudModel`.
 
@@ -319,14 +338,14 @@ class PostSearchRequest extends BaseSearchRequest
 
 Default rules:
 
-| Parameter | Rules |
-|---|---|
-| `perpage` | numeric value from `config('pagination.per_page')` |
-| `paginate` | `true` / `false` / `0` / `1` |
-| `sort` | array |
-| `sort.*` | `asc` or `desc` |
-| `filter` | array |
-| `filter.*` | any nullable value |
+| Parameter  | Rules                                              |
+| ---------- | -------------------------------------------------- |
+| `perpage`  | numeric value from `config('pagination.per_page')` |
+| `paginate` | `true` / `false` / `0` / `1`                       |
+| `sort`     | array                                              |
+| `sort.*`   | `asc` or `desc`                                    |
+| `filter`   | array                                              |
+| `filter.*` | any nullable value                                 |
 
 ### Example request
 
@@ -387,12 +406,12 @@ Without pagination (contract + `paginate=false`):
 
 Aliases are registered automatically:
 
-| Alias | Class | Purpose |
-|---|---|---|
-| `consistent.api-json` | `ApiJsonMiddleware` | Sets `Accept: application/json` for API-prefixed URLs |
-| `consistent.ensure-json` | `EnsureJsonMiddleware` | Requires JSON Content-Type for `POST` / `PUT` / `PATCH` |
-| `consistent.ensure-multipart` | `EnsureMultipartMiddleware` | Requires `multipart/form-data` for `POST` |
-| `consistent.debugger` | `DebuggerMiddleware` | Appends a `debugger` block to JSON responses |
+| Alias                         | Class                       | Purpose                                                 |
+| ----------------------------- | --------------------------- | ------------------------------------------------------- |
+| `consistent.api-json`         | `ApiJsonMiddleware`         | Sets `Accept: application/json` for API-prefixed URLs   |
+| `consistent.ensure-json`      | `EnsureJsonMiddleware`      | Requires JSON Content-Type for `POST` / `PUT` / `PATCH` |
+| `consistent.ensure-multipart` | `EnsureMultipartMiddleware` | Requires `multipart/form-data` for `POST`               |
+| `consistent.debugger`         | `DebuggerMiddleware`        | Appends a `debugger` block to JSON responses            |
 
 ### Example usage
 

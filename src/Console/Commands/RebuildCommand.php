@@ -471,8 +471,10 @@ class RebuildCommand extends Command
         $controllersByModule = [];
 
         foreach ($moves as $move) {
-            if (! str_contains($move['destination'], DIRECTORY_SEPARATOR . 'Controllers' . DIRECTORY_SEPARATOR)
-                && ! str_contains($move['destination'], '/Controllers/')) {
+            if (
+                ! str_contains($move['destination'], DIRECTORY_SEPARATOR . 'Controllers' . DIRECTORY_SEPARATOR)
+                && ! str_contains($move['destination'], '/Controllers/')
+            ) {
                 continue;
             }
 

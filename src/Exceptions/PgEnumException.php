@@ -31,7 +31,7 @@ class PgEnumException extends \Exception
     {
         return new self(
             "Column '{$table}.{$column}' contains invalid values: " . implode(', ', $invalid)
-            . '. Valid enum values are: ' . implode(', ', $valid)
+                . '. Valid enum values are: ' . implode(', ', $valid)
         );
     }
 
