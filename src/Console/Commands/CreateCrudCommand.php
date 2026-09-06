@@ -11,9 +11,9 @@ use RuntimeException;
 
 class CreateCrudCommand extends Command
 {
-    protected $signature = 'consistent:make-crud {model : The model name (e.g. Post)} {--force : Overwrite existing files}';
+    protected $signature = 'consistent:crud {model : The model name (e.g. Post)} {--force : Overwrite existing files}';
 
-    protected $description = 'Create a full CRUD module (model, controller, requests, resource, routes)';
+    protected $description = 'Create a full CRUD module under app/Modules';
 
     public function handle(): int
     {

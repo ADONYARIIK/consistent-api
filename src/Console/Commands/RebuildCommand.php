@@ -6,6 +6,7 @@ namespace Adonyarik\ConsistentApi\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use RuntimeException;
 use SplFileInfo;
 use Throwable;
@@ -14,7 +15,7 @@ class RebuildCommand extends Command
 {
     protected $signature = 'consistent:rebuild';
 
-    protected $description = 'Move conventional Laravel API classes into model modules';
+    protected $description = 'Rebuild conventional API classes into modules under app/Modules';
 
     public function handle(): int
     {
@@ -35,11 +36,12 @@ class RebuildCommand extends Command
         $moves = [];
 
         foreach ($models as $model) {
-            $destination = sprintf('%s/%s/Models/%s.php', $modulesPath, $model['class'], $model['class']);
+            $module = $this->moduleName($model['class']);
+            $destination = sprintf('%s/%s/Models/%s.php', $modulesPath, $module, $model['class']);
             $moves[] = $this->move(
                 $model,
                 $destination,
-                sprintf('%s\\%s\\Models', $modulesNamespace, $model['class']),
+                sprintf('%s\\%s\\Models', $modulesNamespace, $module),
             );
         }
 
@@ -51,10 +53,12 @@ class RebuildCommand extends Command
                     continue;
                 }
 
+                $module = $this->moduleName($model['class']);
+
                 $destination = sprintf(
                     '%s/%s/%s/%s.php',
                     $modulesPath,
-                    $model['class'],
+                    $module,
                     $type,
                     $component['class'],
                 );
@@ -62,7 +66,7 @@ class RebuildCommand extends Command
                 $moves[] = $this->move(
                     $component,
                     $destination,
-                    sprintf('%s\\%s\\%s', $modulesNamespace, $model['class'], $type),
+                    sprintf('%s\\%s\\%s', $modulesNamespace, $module, $type),
                 );
             }
         }
@@ -314,6 +318,11 @@ class RebuildCommand extends Command
             '/(?:^|(?<=[a-z0-9]))' . preg_quote($model, '/') . '(?=[A-Z]|$)/',
             $class,
         );
+    }
+
+    private function moduleName(string $modelClass): string
+    {
+        return Str::pluralStudly($modelClass);
     }
 
     /**

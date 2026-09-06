@@ -17,16 +17,17 @@ Namespace: `Adonyarik\ConsistentApi`
 1. [Installation](#installation)
 2. [Configuration](#configuration)
 3. [Modular structure](#modular-structure)
-4. [Models (`CrudModel`)](#models-crudmodel)
-5. [CRUD controller](#crud-controller)
-6. [Search, filters, and sorting](#search-filters-and-sorting)
-7. [Pagination and responses](#pagination-and-responses)
-8. [Middleware](#middleware)
-9. [Debugger](#debugger)
-10. [Route macro `development`](#route-macro-development)
-11. [PostgreSQL ENUM](#postgresql-enum)
-12. [Extra traits](#extra-traits)
-13. [Package structure](#package-structure)
+4. [Artisan commands](#artisan-commands)
+5. [Models (`CrudModel`)](#models-crudmodel)
+6. [CRUD controller](#crud-controller)
+7. [Search, filters, and sorting](#search-filters-and-sorting)
+8. [Pagination and responses](#pagination-and-responses)
+9. [Middleware](#middleware)
+10. [Debugger](#debugger)
+11. [Route macro `development`](#route-macro-development)
+12. [PostgreSQL ENUM](#postgresql-enum)
+13. [Extra traits](#extra-traits)
+14. [Package structure](#package-structure)
 
 ---
 
@@ -97,10 +98,20 @@ Example layout:
 app/Modules/
 ├── Routes.php              # optional global API routes
 ├── Users/
+│   ├── Controllers/
+│   ├── Models/
+│   ├── Requests/
+│   ├── Resources/
 │   └── Routes.php
 └── Posts/
+    ├── Controllers/
+    ├── Models/
+    ├── Requests/
+    ├── Resources/
     └── Routes.php
 ```
+
+Module folders use the **plural** StudlyCase name of the model (`Post` → `Posts`, `Company` → `Companies`).
 
 Each module `Routes.php` (and the optional root `Routes.php`) is loaded with:
 
@@ -121,6 +132,67 @@ Limit::perMinute(config('consistentapi.request_limit'))
 ```
 
 This may override your application's default `api` limiter. Adjust `request_limit`, or redefine the limiter in your `AppServiceProvider` / `bootstrap/app.php` if needed.
+
+---
+
+## Artisan commands
+
+Both commands use the `consistent:{action}` naming format.
+
+| Command | Purpose |
+|---|---|
+| `php artisan consistent:crud {model}` | Scaffold a full CRUD module |
+| `php artisan consistent:rebuild` | Move existing Laravel API classes into modules |
+
+### `consistent:crud`
+
+Creates a ready-to-extend module for the given model name:
+
+```bash
+php artisan consistent:crud Post
+php artisan consistent:crud Post --force
+```
+
+Generated layout for `Post`:
+
+```text
+app/Modules/Posts/
+├── Controllers/PostController.php
+├── Models/Post.php
+├── Requests/PostSearchRequest.php
+├── Requests/StorePostRequest.php
+├── Requests/UpdatePostRequest.php
+├── Resources/PostResource.php
+└── Routes.php
+```
+
+- Model extends `CrudModel` with empty `$fillable` / `$filter` / `$sort`
+- Controller extends `CrudController` with `index` / `show` / `store` / `update` / `destroy`
+- Search request extends `BaseSearchRequest`
+- `Routes.php` registers REST routes under the plural URI (`posts`) with `{post}` route-model binding
+- Without `--force`, existing target files cause the command to fail
+
+### `consistent:rebuild`
+
+Migrates a conventional Laravel layout into the same plural module structure:
+
+- Models from `app/Models`
+- Controllers from `app/Http/Controllers` (and `app/Controllers`)
+- Requests from `app/Http/Requests` (and `app/Requests`)
+- Resources from `app/Http/Resources` (and `app/Resources`)
+
+Also:
+
+- Rewrites namespaces and class references under `app/`, `routes/`, `database/`, and `tests/`
+- Moves matching route statements from `routes/api.php` into each module’s `Routes.php`
+
+Example:
+
+```bash
+php artisan consistent:rebuild
+```
+
+`Post` + `PostController` become `App\Modules\Posts\Models\Post` and `App\Modules\Posts\Controllers\PostController`.
 
 ---
 
@@ -486,8 +558,14 @@ consistent-api/
 ├── config/
 │   ├── consistentapi.php
 │   └── pagination.php
+├── stubs/
+│   └── crud/
 └── src/
     ├── ConsistentApiProvider.php
+    ├── Console/
+    │   └── Commands/
+    │       ├── CreateCrudCommand.php
+    │       └── RebuildCommand.php
     ├── Contracts/
     │   └── WithoutPaginationModelContract.php
     ├── Controllers/
@@ -524,11 +602,10 @@ consistent-api/
 
 1. `composer require adonyarik/consistent-api`
 2. `php artisan vendor:publish --tag=consistent-api-config`
-3. Create `app/Modules/{Name}/Routes.php`
-4. Extend models from `CrudModel` and define `$filter` / `$sort`
-5. Extend controllers from `CrudController` and set `$resourceClass`
-6. Optionally add middleware aliases to your `api` group
-7. For debugging: `DEBUGGER_ENABLED=true` + `consistent.debugger`
+3. `php artisan consistent:crud Post` (or `consistent:rebuild` for an existing app)
+4. Fill in `$fillable` / `$filter` / `$sort` and request validation rules
+5. Optionally add middleware aliases to your `api` group
+6. For debugging: `DEBUGGER_ENABLED=true` + `consistent.debugger`
 
 ---
 
