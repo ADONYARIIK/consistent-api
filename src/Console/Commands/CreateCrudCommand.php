@@ -47,7 +47,7 @@ class CreateCrudCommand extends Command
         $files = [
             $modulePath . '/Models/' . $modelName . '.php' => 'model.stub',
             $modulePath . '/Controllers/' . $modelName . 'Controller.php' => 'controller.stub',
-            $modulePath . '/Requests/' . $modelName . 'SearchRequest.php' => 'search-request.stub',
+            $modulePath . '/Requests/Search' . $modelName . 'Request.php' => 'search-request.stub',
             $modulePath . '/Requests/Store' . $modelName . 'Request.php' => 'store-request.stub',
             $modulePath . '/Requests/Update' . $modelName . 'Request.php' => 'update-request.stub',
             $modulePath . '/Resources/' . $modelName . 'Resource.php' => 'resource.stub',
