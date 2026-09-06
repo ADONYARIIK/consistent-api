@@ -6,7 +6,7 @@ namespace {{ namespace }}\Requests;
 
 use Adonyarik\ConsistentApi\Requests\BaseSearchRequest;
 
-class {{ model }}SearchRequest extends BaseSearchRequest
+class Search{{ model }}Request extends BaseSearchRequest
 {
     /**
      * @return array<string, mixed>

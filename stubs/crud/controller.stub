@@ -6,7 +6,7 @@ namespace {{ namespace }}\Controllers;
 
 use Adonyarik\ConsistentApi\Controllers\CrudController;
 use {{ namespace }}\Models\{{ model }};
-use {{ namespace }}\Requests\{{ model }}SearchRequest;
+use {{ namespace }}\Requests\Search{{ model }}Request;
 use {{ namespace }}\Requests\Store{{ model }}Request;
 use {{ namespace }}\Requests\Update{{ model }}Request;
 use {{ namespace }}\Resources\{{ model }}Resource;
@@ -19,7 +19,7 @@ class {{ model }}Controller extends CrudController
 
     protected array $relationFunctions = [];
 
-    public function index({{ model }}SearchRequest $request): JsonResponse
+    public function index(Search{{ model }}Request $request): JsonResponse
     {
         return $this->indexLogic($request, new {{ model }}());
     }

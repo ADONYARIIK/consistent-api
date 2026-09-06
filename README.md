@@ -178,7 +178,7 @@ Generated layout for `Post`:
 app/Modules/Posts/
 ├── Controllers/PostController.php
 ├── Models/Post.php
-├── Requests/PostSearchRequest.php
+├── Requests/SearchPostRequest.php
 ├── Requests/StorePostRequest.php
 ├── Requests/UpdatePostRequest.php
 ├── Resources/PostResource.php
@@ -267,7 +267,7 @@ namespace App\Modules\Posts\Controllers;
 
 use Adonyarik\ConsistentApi\Controllers\CrudController;
 use App\Modules\Posts\Models\Post;
-use App\Modules\Posts\Requests\PostSearchRequest;
+use App\Modules\Posts\Requests\SearchPostRequest;
 use App\Modules\Posts\Requests\StorePostRequest;
 use App\Modules\Posts\Requests\UpdatePostRequest;
 use App\Modules\Posts\Resources\PostResource;
@@ -280,7 +280,7 @@ class PostController extends CrudController
 
     protected array $relationFunctions = ['author'];
 
-    public function index(PostSearchRequest $request): JsonResponse
+    public function index(SearchPostRequest $request): JsonResponse
     {
         return $this->indexLogic($request, new Post());
     }
@@ -330,7 +330,7 @@ Use `BaseSearchRequest` or extend it:
 ```php
 use Adonyarik\ConsistentApi\Requests\BaseSearchRequest;
 
-class PostSearchRequest extends BaseSearchRequest
+class SearchPostRequest extends BaseSearchRequest
 {
     // add extra rules if needed
 }
