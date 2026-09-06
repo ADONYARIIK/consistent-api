@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Adonyarik\ConsistentApi;
 
+use Adonyarik\ConsistentApi\Console\Commands\RebuildCommand;
 use Adonyarik\ConsistentApi\Middleware\ApiJsonMiddleware;
 use Adonyarik\ConsistentApi\Middleware\DebuggerMiddleware;
 use Adonyarik\ConsistentApi\Middleware\EnsureJsonMiddleware;
@@ -12,6 +13,7 @@ use Adonyarik\ConsistentApi\Providers\MacroServiceProvider;
 use Adonyarik\ConsistentApi\Providers\ModuleServiceProvider;
 use Adonyarik\ConsistentApi\Providers\PgEnumServiceProvider;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Http\Resources\Json\JsonResource;
 
 class ConsistentApiProvider extends ServiceProvider
 {
@@ -43,5 +45,11 @@ class ConsistentApiProvider extends ServiceProvider
         $router->aliasMiddleware('consistent.ensure-json', EnsureJsonMiddleware::class);
         $router->aliasMiddleware('consistent.ensure-multipart', EnsureMultipartMiddleware::class);
         $router->aliasMiddleware('consistent.debugger', DebuggerMiddleware::class);
+
+        JsonResource::withoutWrapping();
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([RebuildCommand::class]);
+        }
     }
 }
