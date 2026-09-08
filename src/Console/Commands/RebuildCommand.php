@@ -168,7 +168,7 @@ class RebuildCommand extends Command
     /**
      * @param list<string> $directories
      * @return list<array{source: string, class: string, namespace: string, oldClass: string}>
-     */donyarik/consistent-api
+     */
     private function classesInDirectories(array $directories): array
     {
         $classes = [];
@@ -482,7 +482,7 @@ class RebuildCommand extends Command
                 continue;
             }
 
-            $module = $matches[1];donyarik/consistent-api
+            $module = $matches[1];
             $controllersByModule[$module][] = $move;
         }
 
