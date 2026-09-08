@@ -4,21 +4,17 @@ declare(strict_types=1);
 
 namespace {{ namespace }}\Models;
 
+use Adonyarik\ConsistentApi\Attributes\Filterable;
+use Adonyarik\ConsistentApi\Attributes\Sortable;
 use Adonyarik\ConsistentApi\Models\CrudModel;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 
+#[Fillable([])]
+#[Hidden([])]
+#[Filterable([])]
+#[Sortable([])]
 class {{ model }} extends CrudModel
 {
     protected $table = '{{ table }}';
-
-    protected $fillable = [
-        //
-    ];
-
-    protected array $filter = [
-        //
-    ];
-
-    protected array $sort = [
-        //
-    ];
 }

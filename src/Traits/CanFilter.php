@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Adonyarik\ConsistentApi\Traits;
 
+use Adonyarik\ConsistentApi\Attributes\Filterable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use ReflectionClass;
 
 /**
  * @method static Builder filter(array $filters)
@@ -44,6 +46,12 @@ trait CanFilter
 
     public function getAllowedFilters(): array
     {
+        $attribute = (new ReflectionClass($this))->getAttributes(Filterable::class)[0] ?? null;
+
+        if ($attribute !== null) {
+            return $attribute->newInstance()->columns;
+        }
+
         return $this->filter;
     }
 }

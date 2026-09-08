@@ -185,7 +185,7 @@ app/Modules/Posts/
 └── Routes.php
 ```
 
-- Model extends `CrudModel` with empty `$fillable` / `$filter` / `$sort`
+- Model extends `CrudModel` with empty `#[Fillable([])]` / `#[Hidden([])]` / `#[Filterable([])]` / `#[Sortable([])]` declarations (Laravel 13+ for Eloquent attributes)
 - Controller extends `CrudController` with `index` / `show` / `store` / `update` / `destroy`
 - Search request extends `BaseSearchRequest`
 - `Routes.php` registers REST routes under the plural URI (`posts`) with `{post}` route-model binding
@@ -221,13 +221,17 @@ Base API model:
 
 ```php
 use Adonyarik\ConsistentApi\Models\CrudModel;
+use Adonyarik\ConsistentApi\Attributes\Filterable;
+use Adonyarik\ConsistentApi\Attributes\Sortable;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 
+#[Fillable(['title', 'body'])]
+#[Hidden([])]
+#[Filterable(['title', 'body'])]
+#[Sortable(['id', 'created_at', 'title'])]
 class Post extends CrudModel
 {
-    protected array $filter = ['title', 'body'];
-    protected array $sort = ['id', 'created_at', 'title'];
-
-    protected $fillable = ['title', 'body'];
 }
 ```
 
@@ -622,7 +626,7 @@ consistent-api/
 1. `composer require adonyarik/consistent-api`
 2. `php artisan vendor:publish --tag=consistent-api-config`
 3. `php artisan consistent:crud Post` (or `consistent:rebuild` for an existing app)
-4. Fill in `$fillable` / `$filter` / `$sort` and request validation rules
+4. Fill in `#[Fillable(...)]` / `#[Hidden(...)]` / `#[Filterable(...)]` / `#[Sortable(...)]` and request validation rules (Eloquent attributes require Laravel 13+)
 5. Optionally add middleware aliases to your `api` group
 6. For debugging: `DEBUGGER_ENABLED=true` + `consistent.debugger`
 
