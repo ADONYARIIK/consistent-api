@@ -41,7 +41,7 @@ trait CanFilter
 
     public function isFilterable(): bool
     {
-        return ! empty($this->filter);
+        return ! empty($this->getAllowedFilters());
     }
 
     public function getAllowedFilters(): array

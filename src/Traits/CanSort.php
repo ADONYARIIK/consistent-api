@@ -28,7 +28,7 @@ trait CanSort
 
     public function isSortable(): bool
     {
-        return ! empty($this->sort);
+        return ! empty($this->getAllowedSorts());
     }
 
     public function getAllowedSorts(): array
