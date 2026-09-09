@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 use ReflectionClass;
 
 /**
- * @method static Builder filter(array $filters)
+ * @method static \Illuminate\Database\Eloquent\Builder filter(array $filters)
  */
 trait CanFilter
 {

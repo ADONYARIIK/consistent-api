@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use ReflectionClass;
 
 /**
- * @method static Builder sort(array $columns)
+ * @method static \Illuminate\Database\Eloquent\Builder sort(array $columns)
  */
 trait CanSort
 {
