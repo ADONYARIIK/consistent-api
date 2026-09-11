@@ -10,9 +10,7 @@ use Attribute;
 final class Sortable
 {
     /**
-     * @param array<int, string> $columns
+     * @param  array<int|string, mixed>  $columns
      */
-    public function __construct(public array $columns)
-    {
-    }
+    public function __construct(public array $columns) {}
 }

@@ -11,7 +11,7 @@ class ApiJsonMiddleware
 {
     public function handle(Request $request, Closure $next)
     {
-        if ($request->is(config('consistentapi.api_url_prefix') . '/*')) {
+        if ($request->is(config('consistentapi.api_url_prefix').'/*')) {
             $request->headers->set('Accept', 'application/json');
         }
 

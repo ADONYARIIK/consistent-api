@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Adonyarik\ConsistentApi\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Adonyarik\ConsistentApi\Traits\CanFilter;
 use Adonyarik\ConsistentApi\Traits\CanSort;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
 
 class CrudModel extends Model

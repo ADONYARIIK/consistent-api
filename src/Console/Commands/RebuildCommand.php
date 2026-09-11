@@ -21,7 +21,7 @@ class RebuildCommand extends Command
     {
         $modulesFolder = trim((string) config('consistentapi.modules_folder', 'Modules'), '/\\');
         $modulesPath = app_path($modulesFolder);
-        $modulesNamespace = 'App\\' . str_replace('/', '\\', $modulesFolder);
+        $modulesNamespace = 'App\\'.str_replace('/', '\\', $modulesFolder);
 
         File::ensureDirectoryExists($modulesPath);
 
@@ -79,7 +79,7 @@ class RebuildCommand extends Command
             $replacements[$move['oldClass']] = $move['newClass'];
         }
 
-        uksort($replacements, fn(string $left, string $right): int => strlen($right) <=> strlen($left));
+        uksort($replacements, fn (string $left, string $right): int => strlen($right) <=> strlen($left));
 
         $backups = [];
         $completedMoves = [];
@@ -166,7 +166,7 @@ class RebuildCommand extends Command
     }
 
     /**
-     * @param list<string> $directories
+     * @param  list<string>  $directories
      * @return list<array{source: string, class: string, namespace: string, oldClass: string}>
      */
     private function classesInDirectories(array $directories): array
@@ -223,12 +223,12 @@ class RebuildCommand extends Command
             'source' => $file->getPathname(),
             'class' => $class,
             'namespace' => $namespace,
-            'oldClass' => $namespace . '\\' . $class,
+            'oldClass' => $namespace.'\\'.$class,
         ];
     }
 
     /**
-     * @param list<array|string> $tokens
+     * @param  list<array|string>  $tokens
      */
     private function isClassDeclaration(array $tokens, int $index): bool
     {
@@ -260,7 +260,7 @@ class RebuildCommand extends Command
     }
 
     /**
-     * @param list<array|string> $tokens
+     * @param  list<array|string>  $tokens
      */
     private function followingName(array $tokens, int $start): ?string
     {
@@ -271,6 +271,7 @@ class RebuildCommand extends Command
 
             if (is_array($token) && in_array($token[0], [T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED, T_NS_SEPARATOR], true)) {
                 $name .= $token[1];
+
                 continue;
             }
 
@@ -289,21 +290,21 @@ class RebuildCommand extends Command
     }
 
     /**
-     * @param list<array{source: string, class: string, namespace: string, oldClass: string}> $models
+     * @param  list<array{source: string, class: string, namespace: string, oldClass: string}>  $models
      * @return array{source: string, class: string, namespace: string, oldClass: string}|null
      */
     private function modelFor(string $class, array $models): ?array
     {
         $matches = array_values(array_filter(
             $models,
-            fn(array $model): bool => $this->classBelongsToModel($class, $model['class']),
+            fn (array $model): bool => $this->classBelongsToModel($class, $model['class']),
         ));
 
         if ($matches === []) {
             return null;
         }
 
-        usort($matches, fn(array $left, array $right): int => strlen($right['class']) <=> strlen($left['class']));
+        usort($matches, fn (array $left, array $right): int => strlen($right['class']) <=> strlen($left['class']));
 
         return $matches[0];
     }
@@ -315,7 +316,7 @@ class RebuildCommand extends Command
         }
 
         return (bool) preg_match(
-            '/(?:^|(?<=[a-z0-9]))' . preg_quote($model, '/') . '(?=[A-Z]|$)/',
+            '/(?:^|(?<=[a-z0-9]))'.preg_quote($model, '/').'(?=[A-Z]|$)/',
             $class,
         );
     }
@@ -326,7 +327,7 @@ class RebuildCommand extends Command
     }
 
     /**
-     * @param array{source: string, class: string, namespace: string, oldClass: string} $class
+     * @param  array{source: string, class: string, namespace: string, oldClass: string}  $class
      * @return array{source: string, destination: string, namespace: string, oldClass: string, newClass: string, class: string}
      */
     private function move(array $class, string $destination, string $namespace): array
@@ -336,13 +337,13 @@ class RebuildCommand extends Command
             'destination' => $destination,
             'namespace' => $namespace,
             'oldClass' => $class['oldClass'],
-            'newClass' => $namespace . '\\' . $class['class'],
+            'newClass' => $namespace.'\\'.$class['class'],
             'class' => $class['class'],
         ];
     }
 
     /**
-     * @param list<array{source: string, destination: string, namespace: string, oldClass: string, newClass: string, class: string}> $moves
+     * @param  list<array{source: string, destination: string, namespace: string, oldClass: string, newClass: string, class: string}>  $moves
      */
     private function assertDestinationsAreAvailable(array $moves): void
     {
@@ -364,7 +365,7 @@ class RebuildCommand extends Command
     private function replaceNamespace(string $path, string $namespace): void
     {
         $contents = File::get($path);
-        $updated = preg_replace('/^(\\s*)namespace\\s+[^;]+;/m', '$1namespace ' . $namespace . ';', $contents, 1);
+        $updated = preg_replace('/^(\\s*)namespace\\s+[^;]+;/m', '$1namespace '.$namespace.';', $contents, 1);
 
         if (! is_string($updated)) {
             throw new RuntimeException(sprintf('Failed to rewrite namespace in %s', $path));
@@ -374,8 +375,8 @@ class RebuildCommand extends Command
     }
 
     /**
-     * @param array<string, string> $replacements
-     * @param array<string, string> $backups
+     * @param  array<string, string>  $replacements
+     * @param  array<string, string>  $backups
      */
     private function replaceClassReferences(array $replacements, array &$backups): void
     {
@@ -413,7 +414,7 @@ class RebuildCommand extends Command
     }
 
     /**
-     * @param array<string, string> $replacements
+     * @param  array<string, string>  $replacements
      */
     private function applyClassReplacements(string $contents, array $replacements): string
     {
@@ -421,8 +422,8 @@ class RebuildCommand extends Command
 
         foreach ($replacements as $oldClass => $newClass) {
             $replacedUses = preg_replace(
-                '/^(\\s*use\\s+\\\\?)' . preg_quote($oldClass, '/') . '(\\s+(?:as\\s+\\w+)?)?\\s*;/mi',
-                '$1' . $newClass . '$2;',
+                '/^(\\s*use\\s+\\\\?)'.preg_quote($oldClass, '/').'(\\s+(?:as\\s+\\w+)?)?\\s*;/mi',
+                '$1'.$newClass.'$2;',
                 $updated,
             );
 
@@ -433,7 +434,7 @@ class RebuildCommand extends Command
             $updated = $replacedUses;
 
             $replacedFqcn = preg_replace(
-                '/(?<![A-Za-z0-9_])' . preg_quote($oldClass, '/') . '(?![A-Za-z0-9_])/',
+                '/(?<![A-Za-z0-9_])'.preg_quote($oldClass, '/').'(?![A-Za-z0-9_])/',
                 $newClass,
                 $updated,
             );
@@ -449,10 +450,10 @@ class RebuildCommand extends Command
     }
 
     /**
-     * @param list<array{source: string, destination: string, namespace: string, oldClass: string, newClass: string, class: string}> $moves
-     * @param array<string, string> $replacements
-     * @param array<string, string> $backups
-     * @param list<string> $createdFiles
+     * @param  list<array{source: string, destination: string, namespace: string, oldClass: string, newClass: string, class: string}>  $moves
+     * @param  array<string, string>  $replacements
+     * @param  array<string, string>  $backups
+     * @param  list<string>  $createdFiles
      */
     private function relocateApiRoutes(
         array $moves,
@@ -472,13 +473,13 @@ class RebuildCommand extends Command
 
         foreach ($moves as $move) {
             if (
-                ! str_contains($move['destination'], DIRECTORY_SEPARATOR . 'Controllers' . DIRECTORY_SEPARATOR)
+                ! str_contains($move['destination'], DIRECTORY_SEPARATOR.'Controllers'.DIRECTORY_SEPARATOR)
                 && ! str_contains($move['destination'], '/Controllers/')
             ) {
                 continue;
             }
 
-            if (! preg_match('/^' . preg_quote($modulesNamespace, '/') . '\\\\([^\\\\]+)\\\\/', $move['newClass'], $matches)) {
+            if (! preg_match('/^'.preg_quote($modulesNamespace, '/').'\\\\([^\\\\]+)\\\\/', $move['newClass'], $matches)) {
                 continue;
             }
 
@@ -511,7 +512,7 @@ class RebuildCommand extends Command
                 continue;
             }
 
-            $routeFile = $modulesPath . '/' . $module . '/Routes.php';
+            $routeFile = $modulesPath.'/'.$module.'/Routes.php';
 
             if (File::exists($routeFile)) {
                 $this->backupFile($routeFile, $backups);
@@ -541,13 +542,13 @@ class RebuildCommand extends Command
     }
 
     /**
-     * @param list<string> $classes
+     * @param  list<string>  $classes
      */
     private function removeUseStatements(string $contents, array $classes): string
     {
         foreach ($classes as $class) {
             $updated = preg_replace(
-                '/^\\s*use\\s+\\\\?' . preg_quote($class, '/') . '(?:\\s+as\\s+\\w+)?\\s*;\\s*$\\n?/mi',
+                '/^\\s*use\\s+\\\\?'.preg_quote($class, '/').'(?:\\s+as\\s+\\w+)?\\s*;\\s*$\\n?/mi',
                 '',
                 $contents,
             );
@@ -561,7 +562,7 @@ class RebuildCommand extends Command
     }
 
     /**
-     * @param list<string> $needles
+     * @param  list<string>  $needles
      * @return array{0: list<string>, 1: string}
      */
     private function extractMatchingRouteStatements(string $contents, array $needles): array
@@ -583,6 +584,7 @@ class RebuildCommand extends Command
 
             if ($statement === null) {
                 $offset = $start + 7;
+
                 continue;
             }
 
@@ -625,12 +627,14 @@ class RebuildCommand extends Command
                 }
 
                 $index++;
+
                 continue;
             }
 
             if ($char === "'" || $char === '"') {
                 $string = $char;
                 $index++;
+
                 continue;
             }
 
@@ -657,11 +661,11 @@ class RebuildCommand extends Command
     }
 
     /**
-     * @param list<string> $needles
+     * @param  list<string>  $needles
      */
     private function statementReferencesAny(string $statement, array $needles): bool
     {
-        usort($needles, fn(string $left, string $right): int => strlen($right) <=> strlen($left));
+        usort($needles, fn (string $left, string $right): int => strlen($right) <=> strlen($left));
 
         foreach ($needles as $needle) {
             if (str_contains($needle, '\\')) {
@@ -672,7 +676,7 @@ class RebuildCommand extends Command
                 continue;
             }
 
-            if (preg_match('/(?<![A-Za-z0-9_\\\\])' . preg_quote($needle, '/') . '(?![A-Za-z0-9_])/', $statement) === 1) {
+            if (preg_match('/(?<![A-Za-z0-9_\\\\])'.preg_quote($needle, '/').'(?![A-Za-z0-9_])/', $statement) === 1) {
                 return true;
             }
         }
@@ -681,9 +685,9 @@ class RebuildCommand extends Command
     }
 
     /**
-     * @param list<string> $statements
-     * @param list<array{source: string, destination: string, namespace: string, oldClass: string, newClass: string, class: string}> $controllerMoves
-     * @param array<string, string> $replacements
+     * @param  list<string>  $statements
+     * @param  list<array{source: string, destination: string, namespace: string, oldClass: string, newClass: string, class: string}>  $controllerMoves
+     * @param  array<string, string>  $replacements
      */
     private function writeModuleRoutes(
         string $routeFile,
@@ -694,7 +698,7 @@ class RebuildCommand extends Command
         File::ensureDirectoryExists(dirname($routeFile));
 
         $body = implode("\n\n", array_map(
-            fn(string $statement): string => rtrim($this->applyClassReplacements($statement, $replacements), "\n"),
+            fn (string $statement): string => rtrim($this->applyClassReplacements($statement, $replacements), "\n"),
             $statements,
         ));
 
@@ -709,14 +713,14 @@ class RebuildCommand extends Command
         if (File::exists($routeFile)) {
             $existing = File::get($routeFile);
             $existing = $this->ensureUseStatements($existing, $uses);
-            $existing = rtrim($existing) . "\n\n" . $body . "\n";
+            $existing = rtrim($existing)."\n\n".$body."\n";
             File::put($routeFile, $existing);
 
             return;
         }
 
         $useBlock = implode("\n", array_map(
-            fn(string $class): string => 'use ' . $class . ';',
+            fn (string $class): string => 'use '.$class.';',
             array_values(array_unique($uses)),
         ));
 
@@ -725,12 +729,12 @@ class RebuildCommand extends Command
     }
 
     /**
-     * @param list<string> $classes
+     * @param  list<string>  $classes
      */
     private function ensureUseStatements(string $contents, array $classes): string
     {
         foreach (array_values(array_unique($classes)) as $class) {
-            $pattern = '/^\\s*use\\s+\\\\?' . preg_quote($class, '/') . '\\s*;/m';
+            $pattern = '/^\\s*use\\s+\\\\?'.preg_quote($class, '/').'\\s*;/m';
 
             if (preg_match($pattern, $contents) === 1) {
                 continue;
@@ -738,16 +742,18 @@ class RebuildCommand extends Command
 
             if (preg_match('/^declare\\s*\\(strict_types\\s*=\\s*1\\)\\s*;\\s*$/m', $contents, $match, PREG_OFFSET_CAPTURE) === 1) {
                 $insertAt = $match[0][1] + strlen($match[0][0]);
-                $contents = substr($contents, 0, $insertAt) . "\n\nuse {$class};" . substr($contents, $insertAt);
+                $contents = substr($contents, 0, $insertAt)."\n\nuse {$class};".substr($contents, $insertAt);
+
                 continue;
             }
 
             if (preg_match('/^<\\?php\\s*/', $contents, $match) === 1) {
                 $contents = preg_replace('/^<\\?php\\s*/', "<?php\n\nuse {$class};\n\n", $contents, 1) ?? $contents;
+
                 continue;
             }
 
-            $contents = "<?php\n\nuse {$class};\n\n" . $contents;
+            $contents = "<?php\n\nuse {$class};\n\n".$contents;
         }
 
         return $contents;
@@ -768,14 +774,14 @@ class RebuildCommand extends Command
         }
 
         if (! str_starts_with($normalized, '<?php')) {
-            $normalized = "<?php\n\n" . $normalized;
+            $normalized = "<?php\n\n".$normalized;
         }
 
-        return rtrim($normalized) . "\n";
+        return rtrim($normalized)."\n";
     }
 
     /**
-     * @param array<string, string> $backups
+     * @param  array<string, string>  $backups
      */
     private function backupFile(string $path, array &$backups): void
     {
@@ -785,8 +791,8 @@ class RebuildCommand extends Command
     }
 
     /**
-     * @param array<string, string> $backups
-     * @param list<array{source: string, destination: string, namespace: string, oldClass: string, newClass: string, class: string}> $completedMoves
+     * @param  array<string, string>  $backups
+     * @param  list<array{source: string, destination: string, namespace: string, oldClass: string, newClass: string, class: string}>  $completedMoves
      */
     private function restoreBackups(array $backups, array $completedMoves = []): void
     {
@@ -807,7 +813,7 @@ class RebuildCommand extends Command
     }
 
     /**
-     * @param list<array{source: string, destination: string, namespace: string, oldClass: string, newClass: string, class: string}> $moves
+     * @param  list<array{source: string, destination: string, namespace: string, oldClass: string, newClass: string, class: string}>  $moves
      */
     private function undoMoves(array $moves): void
     {

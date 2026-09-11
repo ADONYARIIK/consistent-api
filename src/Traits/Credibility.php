@@ -19,7 +19,7 @@ trait Credibility
     public function checkModelCredibility(Model $model, string $idAttributeName, int $errorStatus = 404, string $errorMessage = 'The model is not credible.'): void
     {
         abort_if(
-            !$this->isCredible($model, $idAttributeName),
+            ! $this->isCredible($model, $idAttributeName),
             $errorStatus,
             $errorMessage
         );

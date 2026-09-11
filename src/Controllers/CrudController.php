@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Adonyarik\ConsistentApi\Controllers;
 
 use Adonyarik\ConsistentApi\Contracts\WithoutPaginationModelContract;
-use Illuminate\Database\Eloquent\Model;
 use Adonyarik\ConsistentApi\Requests\BaseSearchRequest;
 use Adonyarik\ConsistentApi\Responses\PaginatedJsonResponse;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
@@ -142,6 +142,38 @@ class CrudController extends Controller
                                 ],
                             ], JsonResponse::HTTP_UNPROCESSABLE_ENTITY)
                         );
+                    }
+
+                    if (is_array($value)) {
+                        $allowedKeys = $model->getAllowedFilterKeys($column);
+
+                        if ($allowedKeys === null) {
+                            throw new HttpResponseException(
+                                Response::json([
+                                    'message' => 'The given data was invalid.',
+                                    'errors' => [
+                                        "filter.$column" => [
+                                            "Nested filtering by $column is not allowed",
+                                        ],
+                                    ],
+                                ], JsonResponse::HTTP_UNPROCESSABLE_ENTITY)
+                            );
+                        }
+
+                        foreach (array_keys($value) as $nestedKey) {
+                            if (! in_array($nestedKey, $allowedKeys, true)) {
+                                throw new HttpResponseException(
+                                    Response::json([
+                                        'message' => 'The given data was invalid.',
+                                        'errors' => [
+                                            "filter.$column.$nestedKey" => [
+                                                "Filtering by $column.$nestedKey is not allowed.",
+                                            ],
+                                        ],
+                                    ], JsonResponse::HTTP_UNPROCESSABLE_ENTITY)
+                                );
+                            }
+                        }
                     }
                 }
 

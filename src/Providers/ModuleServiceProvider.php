@@ -36,7 +36,7 @@ class ModuleServiceProvider extends RouteServiceProvider
                     continue;
                 }
 
-                $moduleRoutesFile = $modulesPath . '/' . $moduleName . '/Routes.php';
+                $moduleRoutesFile = $modulesPath.'/'.$moduleName.'/Routes.php';
 
                 if (! file_exists($moduleRoutesFile)) {
                     continue;
@@ -47,7 +47,7 @@ class ModuleServiceProvider extends RouteServiceProvider
                     ->group($moduleRoutesFile);
             }
 
-            $globalRoutesFile = $modulesPath . '/Routes.php';
+            $globalRoutesFile = $modulesPath.'/Routes.php';
 
             if (file_exists($globalRoutesFile)) {
                 $this->middleware($middlewares)

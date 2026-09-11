@@ -5,14 +5,9 @@ declare(strict_types=1);
 namespace {{ namespace }}\Requests;
 
 use Adonyarik\ConsistentApi\Requests\BaseSearchRequest;
+use {{ namespace }}\Models\{{ model }};
 
 class Search{{ model }}Request extends BaseSearchRequest
 {
-    /**
-     * @return array<string, mixed>
-     */
-    public function rules(): array
-    {
-        return parent::rules();
-    }
+    protected string $model = {{ model }}::class;
 }

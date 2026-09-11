@@ -12,34 +12,44 @@ use Adonyarik\ConsistentApi\Middleware\EnsureJsonMiddleware;
 use Adonyarik\ConsistentApi\Middleware\EnsureMultipartMiddleware;
 use Adonyarik\ConsistentApi\Providers\MacroServiceProvider;
 use Adonyarik\ConsistentApi\Providers\ModuleServiceProvider;
-use Adonyarik\ConsistentApi\Providers\PgEnumServiceProvider;
-use Illuminate\Support\ServiceProvider;
+use Adonyarik\ConsistentApi\Providers\PostgresEnumServiceProvider;
+use Adonyarik\ConsistentApi\Support\FilterableValidator;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\ServiceProvider;
 
 class ConsistentApiProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/consistentapi.php',
+            __DIR__.'/../config/consistentapi.php',
             'consistentapi'
         );
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/pagination.php',
+            __DIR__.'/../config/pagination.php',
             'pagination'
+        );
+        $this->mergeConfigFrom(
+            __DIR__.'/../config/filters.php',
+            'filters'
         );
 
         $this->app->register(ModuleServiceProvider::class);
         $this->app->register(MacroServiceProvider::class);
-        $this->app->register(PgEnumServiceProvider::class);
+        $this->app->register(PostgresEnumServiceProvider::class);
     }
 
     public function boot(): void
     {
         $this->publishes([
-            __DIR__ . '/../config/consistentapi.php' => config_path('consistentapi.php'),
-            __DIR__ . '/../config/pagination.php' => config_path('pagination.php'),
+            __DIR__.'/../config/consistentapi.php' => config_path('consistentapi.php'),
+            __DIR__.'/../config/pagination.php' => config_path('pagination.php'),
+            __DIR__.'/../config/filters.php' => config_path('filters.php'),
         ], 'consistent-api-config');
+
+        if (config('filters.validate_on_boot', true) && $this->app->environment(['local', 'testing'])) {
+            (new FilterableValidator)->validateAll();
+        }
 
         $router = $this->app['router'];
         $router->aliasMiddleware('consistent.api-json', ApiJsonMiddleware::class);

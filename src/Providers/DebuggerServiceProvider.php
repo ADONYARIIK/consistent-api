@@ -13,9 +13,13 @@ use Symfony\Component\HttpFoundation\Response;
 class DebuggerServiceProvider
 {
     private string $traceId = '';
+
     private bool $active = false;
+
     private float $beginTime = 0.0;
+
     private array $sqlLogs = [];
+
     private int $sqlCount = 0;
 
     public function __construct()
@@ -93,6 +97,6 @@ class DebuggerServiceProvider
         $power = $bytes > 0 ? (int) floor(log($bytes, 1024)) : 0;
         $power = min($power, count($units) - 1);
 
-        return round($bytes / (1024 ** $power), 2) . ' ' . $units[$power];
+        return round($bytes / (1024 ** $power), 2).' '.$units[$power];
     }
 }

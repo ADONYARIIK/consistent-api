@@ -28,8 +28,8 @@ class CreateCrudCommand extends Command
         $moduleName = Str::pluralStudly($modelName);
         $modulesFolder = trim((string) config('consistentapi.modules_folder', 'Modules'), '/\\');
         $modulesPath = app_path($modulesFolder);
-        $modulePath = $modulesPath . '/' . $moduleName;
-        $namespace = 'App\\' . str_replace('/', '\\', $modulesFolder) . '\\' . $moduleName;
+        $modulePath = $modulesPath.'/'.$moduleName;
+        $namespace = 'App\\'.str_replace('/', '\\', $modulesFolder).'\\'.$moduleName;
         $table = Str::snake($moduleName);
         $route = $table;
         $param = Str::snake($modelName);
@@ -45,13 +45,13 @@ class CreateCrudCommand extends Command
         ];
 
         $files = [
-            $modulePath . '/Models/' . $modelName . '.php' => 'model.stub',
-            $modulePath . '/Controllers/' . $modelName . 'Controller.php' => 'controller.stub',
-            $modulePath . '/Requests/Search' . $modelName . 'Request.php' => 'search-request.stub',
-            $modulePath . '/Requests/Store' . $modelName . 'Request.php' => 'store-request.stub',
-            $modulePath . '/Requests/Update' . $modelName . 'Request.php' => 'update-request.stub',
-            $modulePath . '/Resources/' . $modelName . 'Resource.php' => 'resource.stub',
-            $modulePath . '/Routes.php' => 'routes.stub',
+            $modulePath.'/Models/'.$modelName.'.php' => 'model.stub',
+            $modulePath.'/Controllers/'.$modelName.'Controller.php' => 'controller.stub',
+            $modulePath.'/Requests/Search'.$modelName.'Request.php' => 'search-request.stub',
+            $modulePath.'/Requests/Store'.$modelName.'Request.php' => 'store-request.stub',
+            $modulePath.'/Requests/Update'.$modelName.'Request.php' => 'update-request.stub',
+            $modulePath.'/Resources/'.$modelName.'Resource.php' => 'resource.stub',
+            $modulePath.'/Routes.php' => 'routes.stub',
         ];
 
         if (! $force) {
@@ -67,7 +67,7 @@ class CreateCrudCommand extends Command
         foreach ($files as $path => $stub) {
             File::ensureDirectoryExists(dirname($path));
             File::put($path, $this->renderStub($stub, $replacements));
-            $this->line('Created: ' . $path);
+            $this->line('Created: '.$path);
         }
 
         $this->info(sprintf('CRUD module %s created successfully.', $moduleName));
@@ -76,11 +76,11 @@ class CreateCrudCommand extends Command
     }
 
     /**
-     * @param array<string, string> $replacements
+     * @param  array<string, string>  $replacements
      */
     private function renderStub(string $stub, array $replacements): string
     {
-        $path = dirname(__DIR__, 3) . '/stubs/crud/' . $stub;
+        $path = dirname(__DIR__, 3).'/stubs/crud/'.$stub;
 
         if (! File::exists($path)) {
             throw new RuntimeException(sprintf('Stub not found: %s', $path));

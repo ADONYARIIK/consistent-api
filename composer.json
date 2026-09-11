@@ -24,5 +24,8 @@
                 "Adonyarik\\ConsistentApi\\ConsistentApiProvider"
             ]
         }
+    },
+    "require-dev": {
+        "laravel/pint": "^1.32"
     }
 }

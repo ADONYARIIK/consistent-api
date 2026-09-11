@@ -12,7 +12,7 @@ class EnsureJsonMiddleware
 {
     public function handle(Request $request, Closure $next)
     {
-        if (in_array($request->method(), ['POST', 'PUT', 'PATCH']) && !$request->isJson()) {
+        if (in_array($request->method(), ['POST', 'PUT', 'PATCH']) && ! $request->isJson()) {
             return response()->json(['error' => 'The request must have Content-Type: application/json header.'], Response::HTTP_UNSUPPORTED_MEDIA_TYPE);
         }
 
