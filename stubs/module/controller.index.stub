@@ -1,0 +1,4 @@
+    public function index(Search{{ model }}Request $request): JsonResponse
+    {
+        return $this->indexLogic($request, new {{ model }});
+    }

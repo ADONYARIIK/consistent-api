@@ -1,0 +1,13 @@
+{
+    use HasUuids;
+
+    /**
+     * Columns that receive a UUID on insert; the primary key stays auto-incrementing.
+     *
+     * @return list<string>
+     */
+    public function uniqueIds(): array
+    {
+        return ['{{ uuidColumn }}'];
+    }
+}

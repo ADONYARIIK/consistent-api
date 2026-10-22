@@ -1,0 +1,55 @@
+{
+    "name": "adonyarik/consistent-api",
+    "description": "Laravel toolkit for lean, consistent REST APIs: a module generator, modular route structure, a base CRUD controller with per-action resources, advanced filtering and sorting (including relations) with per-access column restrictions, pagination and JSON/multipart middleware.",
+    "keywords": ["laravel", "rest", "api", "crud", "modules", "generator", "filtering", "sorting", "pagination"],
+    "type": "library",
+    "license": "MIT",
+    "homepage": "https://github.com/ADONYARIIK/consistentapi",
+    "support": {
+        "issues": "https://github.com/ADONYARIIK/consistentapi/issues",
+        "source": "https://github.com/ADONYARIIK/consistentapi"
+    },
+    "authors": [
+        {
+            "name": "Yaroslav Tyrchenko",
+            "email": "tyrchenkoy@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "ext-pdo": "*",
+        "ext-tokenizer": "*",
+        "laravel/framework": "^13.30",
+        "nikic/php-parser": "^5.0"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.32",
+        "orchestra/testbench": "^11.0",
+        "phpunit/phpunit": "^12.5.22|^13.1.6"
+    },
+    "suggest": {
+        "adonyarik/pgsql-enums": "Native PostgreSQL ENUM types in migrations and helpers for PHP enums"
+    },
+    "autoload": {
+        "psr-4": {
+            "Adonyarik\\ConsistentApi\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/",
+            "Database\\Factories\\": "tests/Fixtures/Factories/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Adonyarik\\ConsistentApi\\ConsistentApiProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

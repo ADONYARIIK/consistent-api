@@ -1,0 +1,5 @@
+<?php
+
+namespace Tests\InvalidModels\Mixed;
+
+class Ignored extends \Illuminate\Database\Eloquent\Model {}

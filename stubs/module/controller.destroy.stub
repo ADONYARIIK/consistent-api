@@ -1,0 +1,4 @@
+    public function destroy({{ model }} ${{ variable }}): JsonResponse
+    {
+        return $this->destroyLogic(${{ variable }});
+    }

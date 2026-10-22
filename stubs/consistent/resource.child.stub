@@ -1,0 +1,23 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }}\Resources;
+
+use Illuminate\Http\Request;
+
+class {{ class }} extends {{ parent }}
+{
+    /**
+     * Transform the resource into an array: the {{ parent }} fields plus the ones added here.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        return [
+            ...parent::toArray($request),
+            // TODO: add the fields {{ parent }} does not return
+        ];
+    }
+}

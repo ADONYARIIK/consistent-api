@@ -1,0 +1,10 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - src
+        # Models that use the Credibility trait, so PHPStan analyses it
+        - tests/Fixtures/Book.php
+    tmpDir: .phpstan.cache

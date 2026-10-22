@@ -1,0 +1,4 @@
+    public function update(Update{{ model }}Request $request, {{ model }} ${{ variable }}): JsonResource
+    {
+        return $this->updateLogic($request, ${{ variable }});
+    }

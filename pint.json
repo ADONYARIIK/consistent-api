@@ -1,0 +1,16 @@
+{
+  "preset": "laravel",
+  "rules": {
+    "declare_strict_types": true,
+    "phpdoc_no_package": false,
+    "phpdoc_separation": {
+      "groups": [
+        ["package", "author", "since"],
+        ["deprecated", "link", "see"],
+        ["property"],
+        ["property-read"],
+        ["property-write"]
+      ]
+    }
+  }
+}

@@ -1,0 +1,13 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }}\Requests;
+
+use Adonyarik\ConsistentApi\Requests\BaseSearchRequest;
+use {{ namespace }}\Models\{{ model }};
+
+class Search{{ model }}Request extends BaseSearchRequest
+{
+    protected string $model = {{ model }}::class;
+}

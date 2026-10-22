@@ -1,0 +1,4 @@
+    public function show({{ model }} ${{ variable }}): JsonResource
+    {
+        return $this->selectLogic(${{ variable }});
+    }

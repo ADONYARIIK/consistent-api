@@ -1,0 +1,4 @@
+    public function store(Store{{ model }}Request $request): JsonResponse
+    {
+        return $this->storeLogic($request, new {{ model }});
+    }

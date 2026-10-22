@@ -1,0 +1,17 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }}\Controllers;
+
+{{ imports }}
+
+class {{ model }}Controller extends ConsistentController
+{
+    protected string $resourceClass = {{ resourceClass }}::class;
+
+    protected array $resourceClasses = {{ resourceClasses }};
+
+    protected array $relationFunctions = [];
+{{ methods }}
+}

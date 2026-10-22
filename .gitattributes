@@ -1,0 +1,13 @@
+# Stubs are rendered byte for byte: keep LF endings on every platform
+* text=auto
+*.stub text eol=lf
+*.php text eol=lf
+
+# Not part of the Composer package
+/tests export-ignore
+/.gitattributes export-ignore
+/.gitignore export-ignore
+/phpstan.neon export-ignore
+/phpunit.xml export-ignore
+/pint.json export-ignore
+/CHANGELOG.md export-ignore
