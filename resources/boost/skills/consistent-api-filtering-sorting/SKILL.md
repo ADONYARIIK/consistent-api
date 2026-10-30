@@ -164,6 +164,6 @@ With `consistentapi.filters.validate_on_boot` (env `CONSISTENTAPI_VALIDATE_ON_BO
 | `InvalidFilterableOperatorException`   | a declared operator is not enabled in `consistentapi.filters.operators` — enable it or remove it |
 | `InvalidRelationFilterException`       | `RelationFilter` operator other than `eq`/`like`, or a relation method of its (dotted) path is missing or does not return an Eloquent `Relation` |
 | `InvalidRelationSortException`         | `RelationSort` relation method missing, not a relation, or a `MorphTo` |
-| `InvalidAccessException`               | a group in `accesses:` is missing from `consistentapi.accesses`, or a column is declared in two `#[Filterable]` (or two `#[Sortable]`) |
+| `InvalidAccessException`               | a group in `accesses:` is missing from `consistentapi.accesses`, or a column is declared in two `#[Filterable]` (or two `#[Sortable]`); also thrown by `Route::access()` for an unknown group (see `consistent-api-modules`) |
 
 All live in `Adonyarik\ConsistentApi\Exceptions`. The scan does not check that plain columns exist in the table. Production never runs it. If you rename `consistentapi.modules_folder`, update `consistentapi.filters.model_paths` too.

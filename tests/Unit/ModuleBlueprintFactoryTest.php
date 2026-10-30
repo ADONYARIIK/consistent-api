@@ -66,7 +66,7 @@ class ModuleBlueprintFactoryTest extends TestCase
         $this->assertNull($blueprint->uuidColumn);
 
         foreach ($blueprint->routes as $route) {
-            $this->assertSame([], $route['middleware']);
+            $this->assertSame([], $route['accesses']);
         }
     }
 
@@ -91,10 +91,11 @@ class ModuleBlueprintFactoryTest extends TestCase
         $blueprint = $this->make(accesses: ['all-admin,get-guest', 'delete-verified', 'delete-admin']);
 
         $this->assertSame(['guest'], $blueprint->routes['index']['accesses']);
-        $this->assertSame([], $blueprint->routes['index']['middleware']);
         $this->assertSame(['admin'], $blueprint->routes['store']['accesses']);
         $this->assertSame(['verified', 'admin'], $blueprint->routes['destroy']['accesses']);
-        $this->assertSame(['auth:sanctum', 'verified', 'can:admin'], $blueprint->routes['destroy']['middleware']);
+
+        // Groups follow the config order, not the option order
+        $this->assertSame(['verified', 'admin'], $this->make(accesses: ['delete-admin,delete-verified'])->routes['destroy']['accesses']);
     }
 
     public function test_access_name_may_contain_a_dash(): void
@@ -103,7 +104,7 @@ class ModuleBlueprintFactoryTest extends TestCase
 
         $blueprint = $factory->make('Post', [], ['delete-super-admin'], [], false);
 
-        $this->assertSame(['can:all'], $blueprint->routes['destroy']['middleware']);
+        $this->assertSame(['super-admin'], $blueprint->routes['destroy']['accesses']);
     }
 
     public function test_all_access_covers_only_selected_routes(): void
@@ -193,9 +194,16 @@ class ModuleBlueprintFactoryTest extends TestCase
         $this->assertCount(2, $this->errors(routes: [','], resources: [' ']));
     }
 
-    public function test_rejects_different_put_and_patch_middleware(): void
+    public function test_rejects_different_put_and_patch_access_groups(): void
     {
         $this->assertStringContainsString('put and patch', $this->errors(accesses: ['put-admin'])[0]);
+
+        // One Route::match() line serves both, so it can sit in one Route::access() group only, even when two groups have the same middleware
+        $twins = new ModuleBlueprintFactory('/app', 'Modules', ['first' => ['auth'], 'second' => ['auth']], true, 'public_id');
+        $this->assertSame(
+            ['put and patch both route to update() and must have the same access groups, got [first] for put and [second] for patch.'],
+            $this->errors(accesses: ['put-first', 'patch-second'], factory: $twins),
+        );
 
         $this->assertSame(['put', 'patch'], $this->make(accesses: ['put-admin', 'patch-admin'])->routes['update']['methods']);
         $this->assertSame(['patch'], $this->make(routes: ['patch'], accesses: ['patch-admin'])->routes['update']['methods']);

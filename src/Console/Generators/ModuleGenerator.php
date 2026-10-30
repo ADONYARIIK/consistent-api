@@ -221,9 +221,9 @@ final class ModuleGenerator
     /**
      * Renders Routes.php.
      *
-     * Routes without middleware go first, the rest are grouped by identical middleware in order of first
-     * appearance. Each group is a Route::middleware()->group() block preceded by a comment naming the access
-     * groups of every route in it.
+     * Routes without access groups go first, the rest are grouped by identical access groups in order of
+     * first appearance. Each group is a Route::access()->group() block naming the groups, so the routes get
+     * the middleware the groups have in consistentapi.accesses when they register, not a copy made now.
      *
      * @param  ModuleBlueprint  $blueprint  Validated module options
      *
@@ -241,15 +241,14 @@ final class ModuleGenerator
         foreach ($blueprint->routes as $route) {
             $line = $this->routeLine($blueprint, $route['action'], $route['methods']);
 
-            if ($route['middleware'] === []) {
+            if ($route['accesses'] === []) {
                 $topLevel[] = $line;
 
                 continue;
             }
 
-            $key = implode("\0", $route['middleware']);
-            $groups[$key] ??= ['accesses' => [], 'middleware' => $route['middleware'], 'lines' => []];
-            $groups[$key]['accesses'] = array_values(array_unique([...$groups[$key]['accesses'], ...$route['accesses']]));
+            $key = implode("\0", $route['accesses']);
+            $groups[$key] ??= ['accesses' => $route['accesses'], 'lines' => []];
             $groups[$key]['lines'][] = $line;
         }
 
@@ -257,9 +256,8 @@ final class ModuleGenerator
 
         foreach ($groups as $group) {
             $blocks[] = sprintf(
-                "// %s\nRoute::middleware(%s)->group(function () {\n    %s\n});",
-                implode(', ', $group['accesses']),
-                $this->phpList($group['middleware']),
+                "Route::access(%s)->group(function () {\n    %s\n});",
+                implode(', ', array_map($this->phpString(...), $group['accesses'])),
                 implode("\n    ", $group['lines']),
             );
         }
@@ -367,7 +365,7 @@ final class ModuleGenerator
     /**
      * Renders strings as a short PHP array literal.
      *
-     * Each item is single-quoted with quotes and backslashes escaped: ['auth:sanctum', 'verified'].
+     * Each item is single-quoted with quotes and backslashes escaped: ['put', 'patch'].
      *
      * @param  list<string>  $items  Values of the array
      *
@@ -375,7 +373,19 @@ final class ModuleGenerator
      */
     private function phpList(array $items): string
     {
-        return '['.implode(', ', array_map(fn (string $item) => "'".addcslashes($item, "'\\")."'", $items)).']';
+        return '['.implode(', ', array_map($this->phpString(...), $items)).']';
+    }
+
+    /**
+     * PHP single-quoted string literal of a value.
+     *
+     * @param  string  $value  Value to quote
+     *
+     * @return string The literal, with ' and \ escaped
+     */
+    private function phpString(string $value): string
+    {
+        return "'".addcslashes($value, "'\\")."'";
     }
 
     /**

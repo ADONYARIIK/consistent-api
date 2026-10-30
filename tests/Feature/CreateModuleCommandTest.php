@@ -243,7 +243,7 @@ class CreateModuleCommandTest extends TestCase
         $this->assertNotSame('edited', $this->file('Models/Post.php'));
     }
 
-    public function test_routes_are_grouped_by_middleware(): void
+    public function test_routes_are_grouped_by_access_groups(): void
     {
         $this->artisan('consistent:create', [
             'model' => 'Post',
@@ -261,16 +261,14 @@ class CreateModuleCommandTest extends TestCase
             use App\Modules\Posts\Controllers\PostController;
             use Illuminate\Support\Facades\Route;
 
-            // verified
-            Route::middleware(['auth:sanctum', 'verified'])->group(function () {
+            Route::access('verified')->group(function () {
                 Route::get('posts', [PostController::class, 'index'])->name('posts.index');
                 Route::get('posts/{post}', [PostController::class, 'show'])->whereUuid('post')->name('posts.show');
                 Route::post('posts', [PostController::class, 'store'])->name('posts.store');
                 Route::patch('posts/{post}', [PostController::class, 'update'])->whereUuid('post')->name('posts.update');
             });
 
-            // admin
-            Route::middleware(['auth:sanctum', 'verified', 'can:admin'])->group(function () {
+            Route::access('admin')->group(function () {
                 Route::delete('posts/{post}', [PostController::class, 'destroy'])->whereUuid('post')->name('posts.destroy');
             });
 

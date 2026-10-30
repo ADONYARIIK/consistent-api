@@ -7,8 +7,8 @@ namespace Adonyarik\ConsistentApi\Console\Generators;
 /**
  * Validated result of consistent:create options.
  *
- * Holds everything ModuleGenerator needs to render a module: names, paths, routes with their middleware
- * and the resources to generate. Only ModuleBlueprintFactory builds it, so the values are always
+ * Holds everything ModuleGenerator needs to render a module: names, paths, routes with their access
+ * groups and the resources to generate. Only ModuleBlueprintFactory builds it, so the values are always
  * consistent with each other.
  *
  * @package Adonyarik\ConsistentApi\Console\Generators
@@ -29,7 +29,7 @@ final class ModuleBlueprint
      * @param  string  $table  Table name, the snake_case module name
      * @param  string  $uri  Route URI and route name prefix, the kebab-case module name
      * @param  string  $parameter  Route parameter, the snake_case model name
-     * @param  array<string, array{action: RouteAction, methods: list<string>, accesses: list<string>, middleware: list<string>}>  $routes  Keyed by action name, in RouteAction order
+     * @param  array<string, array{action: RouteAction, methods: list<string>, accesses: list<string>}>  $routes  Keyed by action name, in RouteAction order; accesses in config order
      * @param  list<ResourceKind>  $resources  In ResourceKind order
      * @param  string|null  $uuidColumn  UUID route key column, null without --uuid
      */

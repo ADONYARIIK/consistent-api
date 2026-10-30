@@ -16,6 +16,7 @@ use Tests\Fixtures\Author;
 use Tests\Fixtures\Book;
 use Tests\Fixtures\BookController;
 use Tests\Fixtures\BookPolicy;
+use Tests\Fixtures\OwnBookController;
 use Tests\Fixtures\ProfileController;
 use Tests\Fixtures\TagController;
 use Tests\TestCase;
@@ -41,6 +42,9 @@ class ControllerTest extends TestCase
             $router->delete('books/{book}', [BookController::class, 'destroy']);
             $router->get('profiles', [ProfileController::class, 'index']);
             $router->get('tags', [TagController::class, 'index']);
+            $router->get('own-books', [OwnBookController::class, 'index']);
+            $router->post('own-books', [OwnBookController::class, 'store']);
+            $router->patch('own-books/{book}', [OwnBookController::class, 'update']);
         });
 
         // Without the api group no SubstituteBindings: the actions get empty models
@@ -236,6 +240,43 @@ class ControllerTest extends TestCase
         $book = Book::where('title', 'Owned')->firstOrFail();
         $this->assertSame(Author::where('name', 'Ann')->value('id'), $book->author_id);
         $this->assertSame(77, (int) $book->price);
+    }
+
+    public function test_index_query_scopes_the_list_before_the_requested_filters_and_sorts(): void
+    {
+        $this->getJson('/api/own-books?sort[title]=asc')
+            ->assertOk()
+            ->assertJsonPath('items.*.title', ['Dune', 'The Ring'])
+            ->assertJsonPath('meta.total', 2);
+
+        // Filters narrow the scoped list; a filter matching other authors' books cannot widen it
+        $this->getJson('/api/own-books?filter[title]=ring')->assertOk()->assertJsonPath('items.*.title', ['The Ring']);
+        $this->getJson('/api/own-books?filter[author]=bob')->assertOk()->assertJsonPath('meta.total', 0);
+        $this->getJson('/api/own-books?sort[editor]=desc')->assertOk()->assertJsonPath('items.*.title', ['The Ring', 'Dune']);
+
+        // The 422 checks are the same as without the hook
+        $this->getJson('/api/own-books?sort[status]=asc')->assertStatus(422)->assertJsonValidationErrors(['sort.status']);
+
+        $this->getJson('/api/own-books', ['X-Admin' => '1'])->assertOk()->assertJsonPath('meta.total', 4);
+    }
+
+    public function test_before_store_and_before_update_take_precedence_over_the_input(): void
+    {
+        $ann = Author::where('name', 'Ann')->value('id');
+        $bob = Author::where('name', 'Bob')->value('id');
+
+        $this->postJson('/api/own-books', ['title' => 'Mine', 'author_id' => $bob])
+            ->assertCreated()
+            ->assertJson(['title' => 'Mine', 'author' => 'Ann']);
+        $this->assertSame($ann, Book::where('title', 'Mine')->value('author_id'));
+
+        $id = $this->bookId('Emma');
+
+        $this->patchJson('/api/own-books/'.$id, ['status' => 'draft'])->assertOk();
+        $this->assertNotSame($ann, Book::find($id)?->editor_id);
+
+        $this->patchJson('/api/own-books/'.$id, ['title' => 'Emma II'])->assertOk()->assertJson(['title' => 'Emma II']);
+        $this->assertSame($ann, Book::find($id)?->editor_id);
     }
 
     public function test_cancelled_writes_answer_409_and_change_nothing(): void

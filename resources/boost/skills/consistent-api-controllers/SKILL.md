@@ -1,6 +1,6 @@
 ---
 name: consistent-api-controllers
-description: "Controllers, resources and responses on top of adonyarik/consistent-api — ConsistentController with indexLogic / selectLogic / storeLogic / updateLogic / destroyLogic, $resourceClass / $resourceClasses / $relationFunctions, the paginated JSON response shape, WithoutPaginationModelContract, ConsistentModel helpers (joinOnce, factories, page size), policies and authorizeAction, the Credibility trait for nested routes, the consistent.* middleware and Route::development(). Use when adding or changing controller actions, returning different resources per action, building nested or custom list endpoints, choosing request middleware, or writing feature tests against these endpoints."
+description: "Controllers, resources and responses on top of adonyarik/consistent-api — ConsistentController with indexLogic / selectLogic / storeLogic / updateLogic / destroyLogic, $resourceClass / $resourceClasses / $relationFunctions, the indexQuery / beforeStore / beforeUpdate hooks, the paginated JSON response shape, WithoutPaginationModelContract, ConsistentModel helpers (joinOnce, factories, page size), policies and authorizeAction, the Credibility trait for nested routes, the consistent.* middleware and Route::development(). Use when adding or changing controller actions, returning different resources per action, scoping lists to the current user, setting server-side attributes in a shared trait, building nested or custom list endpoints, choosing request middleware, or writing feature tests against these endpoints."
 ---
 
 # Consistent API: controllers and responses
@@ -64,14 +64,14 @@ class PostController extends ConsistentController
 
 | Method                                    | Does                                                          | Returns |
 | ----------------------------------------- | ------------------------------------------------------------- | ------- |
-| `indexLogic(BaseSearchRequest, ConsistentModel)` | authorize `viewAny` + `$model::query()` + 422 checks + `sort()` / `filter()` + order by primary key + paginate | `PaginatedJsonResponse`, 200 |
+| `indexLogic(BaseSearchRequest, ConsistentModel)` | authorize `viewAny` + `indexQuery($model::query())` + 422 checks + `sort()` / `filter()` + order by primary key + paginate | `PaginatedJsonResponse`, 200 |
 | `selectLogic(Model)`                      | 404 if not stored, authorize `view`, loads `$relationFunctions` | resource, 200 |
-| `storeLogic(FormRequest, Model)`          | authorize `create`, `$model->fill($request->validated())->save()` on the given new instance | resource, 201 |
-| `updateLogic(FormRequest, Model)`         | 404 if not stored, authorize `update`, `fill($request->validated())->save()` | resource, 200 |
+| `storeLogic(FormRequest, Model)`          | authorize `create`, `fill($request->validated())`, `beforeStore()`, `save()` on the given new instance | resource, 201 |
+| `updateLogic(FormRequest, Model)`         | 404 if not stored, authorize `update`, `fill($request->validated())`, `beforeUpdate()`, `save()` | resource, 200 |
 | `destroyLogic(Model)`                     | 404 if not stored, authorize `delete`, `$model->delete()` (soft deletes and events work) | empty, 204 |
 
 - `ConsistentController` extends `Illuminate\Routing\Controller` with `AuthorizesRequests` and `ValidatesRequests`, so `$this->authorize()` and `$this->validate()` are available.
-- `storeLogic()` / `updateLogic()` save only `validated()` and mass-assign it: every validated field must be in the model's `#[Fillable]`. Generated Store/Update requests have empty `rules()` — fill them first. Never put an owner column (`user_id`) into rules / `#[Fillable]`: set it on the instance passed to `storeLogic()`.
+- `storeLogic()` / `updateLogic()` save only `validated()` and mass-assign it: every validated field must be in the model's `#[Fillable]`. Generated Store/Update requests have empty `rules()` — fill them first. Never put an owner column (`user_id`) into rules / `#[Fillable]`: set it on the instance passed to `storeLogic()` or in `beforeStore()`.
 - A write cancelled by a model event (`creating` / `updating` / `saving` / `deleting` listener returning `false`) answers 409 `{"message": "The record was not …"}`; override `writeRefused()` to change it. An existing model passed to `storeLogic()` is a `LogicException`.
 - `indexLogic()` takes a `ConsistentModel` (traits `CanFilter`, `CanSort`); only its class and declarations are used. The other methods work with any Eloquent model.
 - `$resourceClass` defaults to `JsonResource` (all visible attributes).
@@ -79,7 +79,41 @@ class PostController extends ConsistentController
 ### Authorization
 
 Every `*Logic()` calls `authorizeAction($ability, $modelOrClass)` first. When a policy exists for the model (registered, or discovered, e.g. `App\Modules\Posts\Policies\PostPolicy`), it runs `$this->authorize()` → 403 on denial or a missing policy method (a policy without `viewAny` denies the index). Without a policy everything is allowed and only route middleware protect the endpoints, so for record-level rules write a policy. Override `authorizeAction()` for custom checks, or with an empty body to switch it off.
+
 - The resource is picked by the controller method the route points to: its `$resourceClasses` entry, else `$resourceClass`. Several actions can share one `*Logic` call with different resources (`'adminIndex' => PostAdminResource::class`). If you override `callAction()`, call `parent::callAction()`, or every action falls back to `$resourceClass`. In your own code, `$this->resourceClassFor()` returns the current action's class (or that of the method name passed).
+
+### Hooks
+
+Protected methods to override in a controller or in a trait shared by several controllers; the defaults do nothing.
+
+```php
+use Adonyarik\ConsistentApi\Requests\BaseSearchRequest;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Http\FormRequest;
+
+trait OwnedByUser // for controllers of modules whose records belong to a user
+{
+    // Base query of indexLogic(): gets $model::query(); requested filters and sorts are applied to the result
+    protected function indexQuery(Builder $query, BaseSearchRequest $request): Builder
+    {
+        return $query->whereBelongsTo($request->user());
+    }
+
+    // After authorization and fill($request->validated()), before save(): overrides the client's input
+    protected function beforeStore(FormRequest $request, Model $model): void
+    {
+        $model->user()->associate($request->user());
+    }
+
+    // Same moment in updateLogic(); isDirty() / getOriginal() tell what the request changes
+    protected function beforeUpdate(FormRequest $request, Model $model): void {}
+}
+```
+
+- Constraints from `indexQuery()` hold whatever the client sends: filters only narrow them, the 422 checks stay, `meta.total` counts only allowed rows. Qualify columns (`$query->qualifyColumn('user_id')`; `whereBelongsTo()` does it), wrap `orWhere()` in `where(fn (Builder $q) => …)`; an `orderBy()` there comes before the requested sorts.
+- Prefer `beforeStore()` over setting attributes before `storeLogic()` when several actions or controllers share the rule. Throw an `HttpException` in a `before*` hook to refuse the write.
+- `indexQuery()` scopes only the list: `show` / `update` / `destroy` get the route-bound model, so restrict them with a policy.
 
 ## Responses
 
@@ -103,9 +137,9 @@ Every `*Logic()` calls `authorizeAction($ability, $modelOrClass)` first. When a 
 - With `app.debug` off, a missing route-bound model under the API prefix is `404 {"message": "Not found."}` (`consistentapi.hide_model_not_found`).
 - `new \Adonyarik\ConsistentApi\Responses\PaginatedJsonResponse($paginator, PostResource::class)` builds the paginated shape for your own queries; it takes any `LengthAwarePaginator` contract and merges the collection's `with()` / `additional()` data.
 
-## Custom list endpoints
+## Scoped and custom list endpoints
 
-`indexLogic()` always starts from `$model::query()`: it cannot take a constrained query. For a scoped list (a post's comments, the current user's posts) either add a scope the model always applies, or build the query with the model's scopes:
+For a scoped list (the current user's posts, a post's comments) override `indexQuery()` (see Hooks) and keep `indexLogic()`: route parameters are available there as `$request->route('post')`. For an endpoint `indexLogic()` cannot express, build the query with the model's scopes:
 
 ```php
 use Adonyarik\ConsistentApi\Responses\PaginatedJsonResponse;

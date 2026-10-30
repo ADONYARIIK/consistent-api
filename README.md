@@ -36,6 +36,7 @@ Namespace: `Adonyarik\ConsistentApi`
   - [Controller (`ConsistentController`)](#controller-consistentcontroller)
     - [Methods](#methods)
     - [Authorization](#authorization)
+    - [Hooks](#hooks)
     - [Resource per action (`$resourceClasses`)](#resource-per-action-resourceclasses)
   - [Filtering](#filtering)
     - [Simple columns](#simple-columns)
@@ -54,6 +55,7 @@ Namespace: `Adonyarik\ConsistentApi`
   - [Middleware](#middleware)
     - [JSON for API URLs](#json-for-api-urls)
     - [Example usage](#example-usage)
+  - [Route macro `access`](#route-macro-access)
   - [Route macro `development`](#route-macro-development)
   - [Extra traits](#extra-traits)
     - [`Credibility`](#credibility)
@@ -80,7 +82,7 @@ The service provider is registered via Laravel package discovery:
 It automatically boots:
 
 - `ModuleServiceProvider` — module routes and the `api` rate limiter
-- `MacroServiceProvider` — `Route::development()`
+- `MacroServiceProvider` — `Route::access()` and `Route::development()`
 
 Publish the config file:
 
@@ -151,9 +153,10 @@ Access groups give names to sets of route middleware. The package ships the sect
 
 Group names may contain letters, digits and `_ . : -`.
 
-Groups are used in two places:
+Groups are used in three places:
 
-- `consistent:create --accesses=delete-admin` writes the group's middleware into the module's `Routes.php` (see [Access groups on routes](#access-groups-on-routes));
+- `Route::access('admin')` puts the group's middleware on routes in your route files (see [Route macro `access`](#route-macro-access));
+- `consistent:create --accesses=delete-admin` puts the generated routes into a `Route::access('admin')` group in the module's `Routes.php` (see [Access groups on routes](#access-groups-on-routes));
 - `#[Filterable(..., accesses: ['admin'])]` / `#[Sortable(..., accesses: ['admin'])]` make columns available only to requests that have the access (see [Restricting columns by access](#restricting-columns-by-access)).
 
 A request has access `admin` when its route runs **every** middleware of the `admin` group:
@@ -311,15 +314,15 @@ app/Modules/Posts/
 
 #### Access groups on routes
 
-`--accesses` puts the middleware of [access groups](#access-groups-consistentapiaccesses) on the generated routes:
+`--accesses` protects the generated routes with [access groups](#access-groups-consistentapiaccesses), through the [`Route::access()`](#route-macro-access) macro:
 
 - `all-…` applies to every selected route; methods missing from `--routes` are skipped.
 - An entry for a specific method replaces `all` for that method, and several entries for one method are merged. `--accesses=all-admin,get-guest` keeps reads public (`guest` is an empty group) and puts everything else behind `admin`.
 - `get` covers both `index` and `show`.
-- A route gets the union of its groups' middleware, in config order, without duplicates.
-- `put` and `patch` share `update()`, so they must end up with the same middleware.
+- A route with several groups gets them all in one call, in config order: `Route::access('verified', 'admin')`.
+- `put` and `patch` share `update()` (one `Route::match()` line), so they must end up with the same groups.
 
-Routes without middleware are written at the top level. The rest are grouped by identical middleware in order of first appearance, each group commented with the access names of all its routes. Example:
+Routes without groups are written at the top level. The rest are grouped by identical groups in order of first appearance, each set in its own `Route::access(...)->group()` block. A group without middleware (`guest`) gets a block too, so the routes pick up whatever middleware the group gets later. Example:
 
 ```bash
 php artisan consistent:create Post --routes=get,post,patch,delete --accesses=all-verified,delete-admin --uuid
@@ -343,19 +346,19 @@ declare(strict_types=1);
 use App\Modules\Posts\Controllers\PostController;
 use Illuminate\Support\Facades\Route;
 
-// verified
-Route::middleware(['auth:sanctum', 'verified'])->group(function () {
+Route::access('verified')->group(function () {
     Route::get('posts', [PostController::class, 'index'])->name('posts.index');
     Route::get('posts/{post}', [PostController::class, 'show'])->whereUuid('post')->name('posts.show');
     Route::post('posts', [PostController::class, 'store'])->name('posts.store');
     Route::patch('posts/{post}', [PostController::class, 'update'])->whereUuid('post')->name('posts.update');
 });
 
-// admin
-Route::middleware(['auth:sanctum', 'verified', 'can:admin'])->group(function () {
+Route::access('admin')->group(function () {
     Route::delete('posts/{post}', [PostController::class, 'destroy'])->whereUuid('post')->name('posts.destroy');
 });
 ```
+
+The file names the groups, not their middleware: the routes get the middleware the groups have in `consistentapi.accesses` when they register, so a later change of a group applies to every module generated with it (rebuild the route cache after the change).
 
 #### UUID route keys
 
@@ -380,7 +383,7 @@ The command collects every problem with the options and prints them together; if
 - an unknown `--routes` / `--resources` value (also next to `all`), or an empty list;
 - an `--accesses` entry not in `method-access` form, with an unknown method, with a method not selected in `--routes`, or with characters other than letters, digits and `_ . : -` in the group name;
 - an access group missing from `consistentapi.accesses` (publish the config first) or not a list of middleware names;
-- `put` and `patch` ending up with different middleware;
+- `put` and `patch` ending up with different access groups;
 - `--uuid` while `consistentapi.uuid` is `false` or `uuid_column` is not a column name;
 - a target file that already exists, without `--force`;
 - a module that already holds another model, even with `--force`: `Datum` and `Data` both make the module `Data`.
@@ -570,7 +573,7 @@ class PostController extends ConsistentController
 
 `indexLogic` takes a `ConsistentModel` (it needs the `CanFilter` and `CanSort` traits); the other methods work with any Eloquent model.
 
-- `storeLogic` fills the given instance with `$request->validated()` and saves it, so the validated attributes must be fillable, and attributes you set before keep their values. Set what must not come from the client on the instance:
+- `storeLogic` fills the given instance with `$request->validated()` and saves it, so the validated attributes must be fillable, and attributes you set before keep their values. Set what must not come from the client on the instance, or in [`beforeStore()`](#hooks) when several actions share the rule:
 
   ```php
   public function store(StorePostRequest $request): JsonResponse
@@ -616,6 +619,55 @@ class PostPolicy
 ```
 
 Override `authorizeAction()` to authorize differently, or with an empty body to switch it off. The form requests `consistent:create` generates have no `authorize()` method, so `FormRequest` allows them; add one when a request needs its own check.
+
+### Hooks
+
+Protected methods that the `*Logic` methods call, so a controller — or a trait shared by several controllers — changes the logic without rewriting it. The defaults do nothing.
+
+| Hook | Called by | When |
+| ---- | --------- | ---- |
+| `indexQuery(Builder $query, BaseSearchRequest $request): Builder` | `indexLogic` | builds the base query: receives `$model::query()`, and the requested filters and sorts are applied to what it returns |
+| `beforeStore(FormRequest $request, Model $model): void` | `storeLogic` | after authorization and `fill($request->validated())`, before `save()` |
+| `beforeUpdate(FormRequest $request, Model $model): void` | `updateLogic` | after authorization and `fill($request->validated())`, before `save()` |
+
+A trait for modules whose records belong to a user:
+
+```php
+namespace App\Modules\Concerns;
+
+use Adonyarik\ConsistentApi\Requests\BaseSearchRequest;
+use App\Http\Middleware\AdminMiddleware;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Http\FormRequest;
+
+trait OwnedByUser
+{
+    protected function indexQuery(Builder $query, BaseSearchRequest $request): Builder
+    {
+        return AdminMiddleware::isAdminRequest($request) ? $query : $query->whereBelongsTo($request->user());
+    }
+
+    protected function beforeStore(FormRequest $request, Model $model): void
+    {
+        $model->user()->associate($request->user());
+    }
+}
+```
+
+```php
+class NoteController extends ConsistentController
+{
+    use OwnedByUser;
+
+    // index(), store(), … as usual
+}
+```
+
+- Constraints added in `indexQuery()` hold whatever the client sends: filters only narrow the result further, the `422` checks stay the same, and `meta.total` counts only the rows the query allows.
+- Qualify the columns you name (`$query->qualifyColumn('user_id')`; `whereBelongsTo()` does it already), since scopes may join other tables, and wrap `orWhere()` conditions in `where(fn (Builder $query) => …)`, or the requested filters attach to the last of them only. An `orderBy()` added there comes before the requested sorts.
+- Attributes set in `beforeStore()` / `beforeUpdate()` take precedence over the client's input. In `beforeUpdate()`, `isDirty()` and `getOriginal()` tell what the request changes. Throw an `HttpException` to refuse the write.
+- `indexQuery()` scopes only the list. `show`, `update` and `destroy` receive the route-bound model, so restrict them to the owner with a [policy](#authorization).
 
 ### Resource per action (`$resourceClasses`)
 
@@ -1033,6 +1085,35 @@ Attach `EnsureMultipartMiddleware` only to upload endpoints: any non-POST reques
 
 ---
 
+## Route macro `access`
+
+Protects routes with [access groups](#access-groups-consistentapiaccesses) by name, instead of repeating their middleware in every route file:
+
+```php
+use Illuminate\Support\Facades\Route;
+
+Route::access('verified')->group(function () {
+    Route::get('posts', [PostController::class, 'index'])->name('posts.index');
+    Route::post('posts', [PostController::class, 'store'])->name('posts.store');
+
+    Route::delete('posts/{post}', [PostController::class, 'destroy'])->access('admin')->name('posts.destroy');
+});
+
+Route::access('admin')->prefix('admin')->name('admin.')->group(function () {
+    // ...
+});
+```
+
+With the groups from the [example config](#access-groups-consistentapiaccesses), `Route::access('verified')` is `Route::middleware(['auth:sanctum', 'verified'])`, and a route with `access('admin')` always has the `admin` access that [restricted columns](#restricting-columns-by-access) check. A typo in a group name, a group that is not a list of middleware names or `Route::access()` without groups throws `InvalidAccessException` while the routes register, so a mistake cannot leave routes unprotected.
+
+- `Route::access(...)` returns a route registrar: chain `group()`, `get()`, `prefix()`, `name()`, … as after `Route::middleware()`. Unlike Laravel's registrar, a later `->middleware('throttle:10,1')` adds to the group's middleware instead of replacing them.
+- It also continues another registrar, keeping what was set before: `Route::prefix('admin')->access('admin')`.
+- On a single route, `->access('admin')` adds only the middleware the route does not have yet from its groups.
+- Several groups — `access('verified', 'admin')` or `access(['verified', 'admin'])` — give the union of their middleware, in config order, without duplicates.
+- The middleware are read from the config while the routes register, as if they were written in the route file. After changing a group, rebuild the route cache (`php artisan route:cache`).
+
+---
+
 ## Route macro `development`
 
 Routes available only in the `local` environment:
@@ -1081,9 +1162,9 @@ The package ships [Agent Skills](https://agentskills.io) for [Laravel Boost](htt
 
 | Skill | Covers |
 | ----- | ------ |
-| `consistent-api-modules` | `consistent:create` / `consistent:rebuild`, the module layout and `Routes.php`, access groups on routes, UUID route keys, `config/consistentapi.php` |
+| `consistent-api-modules` | `consistent:create` / `consistent:rebuild`, the module layout and `Routes.php`, access groups on routes and `Route::access()`, UUID route keys, `config/consistentapi.php` |
 | `consistent-api-filtering-sorting` | `#[Filterable]` / `#[Sortable]`, operators, `RelationFilter` / `RelationSort`, columns restricted by access, `BaseSearchRequest`, the `filter` / `sort` / `perpage` query syntax, `422` errors, startup validation exceptions |
-| `consistent-api-controllers` | `ConsistentController` and its `*Logic` methods, resources per action, response shapes, `WithoutPaginationModelContract`, `ConsistentModel` helpers, `Credibility`, middleware, `Route::development()`, feature tests |
+| `consistent-api-controllers` | `ConsistentController` and its `*Logic` methods and hooks, resources per action, response shapes, `WithoutPaginationModelContract`, `ConsistentModel` helpers, `Credibility`, middleware, `Route::development()`, feature tests |
 
 The skills live in `resources/boost/skills/{skill-name}/SKILL.md`.
 
@@ -1174,6 +1255,7 @@ consistent-api/
     │   └── PaginatedJsonResponse.php
     ├── Support/
     │   ├── AccessResolver.php
+    │   ├── AccessRouteRegistrar.php
     │   ├── FilterableSortableValidator.php
     │   ├── ModulesFolder.php
     │   ├── PhpClassReader.php

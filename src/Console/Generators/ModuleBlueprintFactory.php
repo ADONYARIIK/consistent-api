@@ -11,8 +11,8 @@ use Illuminate\Support\Str;
 /**
  * Parses and validates consistent:create options.
  *
- * Turns the raw command arguments into a ModuleBlueprint: normalizes option values, resolves access
- * groups to route middleware and derives the module names and paths. It collects every error before
+ * Turns the raw command arguments into a ModuleBlueprint: normalizes option values, checks the access
+ * groups against consistentapi.accesses and derives the module names and paths. It collects every error before
  * failing, so the user sees all problems at once. Config comes in through the constructor, so the factory
  * works without a booted application.
  *
@@ -91,7 +91,7 @@ final class ModuleBlueprintFactory
      * and not a name that would clash with a class the generated files import (Fillable, JsonResource,
      * ...). Its module must not be Middleware, a folder ModuleServiceProvider skips. The modules folder
      * must be valid. Routes, resources and accesses are parsed; put and patch must end up with the same
-     * middleware, since both route to update(); --uuid needs consistentapi.uuid and a valid uuid_column.
+     * access groups, since both route to update(); --uuid needs consistentapi.uuid and a valid uuid_column.
      * The module is the plural of the model; its table is snake_case, its URI and route names kebab-case,
      * its route parameter snake_case and the controller variable camelCase, with acronyms kept as one word
      * (APIKey: api_keys, api-keys, api_key, $apiKey).
@@ -130,18 +130,12 @@ final class ModuleBlueprintFactory
 
         array_push($errors, ...$this->nameErrors($model));
 
-        $methodMiddleware = [];
-
-        foreach ($methodAccesses as $method => $names) {
-            $methodMiddleware[$method] = $this->middlewareOf($names);
-        }
-
-        if (isset($methodMiddleware['put'], $methodMiddleware['patch'])
-            && $methodMiddleware['put'] !== $methodMiddleware['patch']) {
+        if (isset($methodAccesses['put'], $methodAccesses['patch'])
+            && $methodAccesses['put'] !== $methodAccesses['patch']) {
             $errors[] = sprintf(
-                'put and patch both route to update() and must have the same middleware, got [%s] for put and [%s] for patch.',
-                implode(', ', $methodMiddleware['put']),
-                implode(', ', $methodMiddleware['patch']),
+                'put and patch both route to update() and must have the same access groups, got [%s] for put and [%s] for patch.',
+                implode(', ', $methodAccesses['put']),
+                implode(', ', $methodAccesses['patch']),
             );
         }
 
@@ -168,7 +162,6 @@ final class ModuleBlueprintFactory
                 'action' => $action,
                 'methods' => $actionMethods,
                 'accesses' => $methodAccesses[$actionMethods[0]],
-                'middleware' => $methodMiddleware[$actionMethods[0]],
             ];
         }
 
@@ -357,9 +350,10 @@ final class ModuleBlueprintFactory
      *
      * Each entry is method-access and is split at the first dash, so access names may contain dashes; the
      * method is case-insensitive, the access is a config key taken as is and may contain only letters,
-     * digits and _ . : - (it ends up in a comment of Routes.php). An entry for a specific method
-     * replaces "all" for that method; entries for one method are merged. Unknown methods, methods missing
-     * from --routes, undefined groups and groups that are not lists of middleware names are reported.
+     * digits and _ . : - (it is written into the Route::access() calls of Routes.php). An entry for a
+     * specific method replaces "all" for that method; entries for one method are merged. Unknown methods,
+     * methods missing from --routes, undefined groups and groups that are not lists of middleware names
+     * are reported.
      *
      * @param  array<int, mixed>  $raw  Raw --accesses values
      * @param  list<string>  $methods  Selected HTTP methods
@@ -437,33 +431,9 @@ final class ModuleBlueprintFactory
     }
 
     /**
-     * Union of the groups' middleware, without duplicates.
-     *
-     * Keeps the order of first appearance, so verified + admin gives auth:sanctum, verified, can:admin.
-     *
-     * @param  list<string>  $accesses  Access group names, already validated
-     *
-     * @return list<string> Middleware of the route
-     */
-    private function middlewareOf(array $accesses): array
-    {
-        $middleware = [];
-
-        foreach ($accesses as $access) {
-            foreach ($this->accessGroups[$access] as $item) {
-                if (! in_array($item, $middleware, true)) {
-                    $middleware[] = $item;
-                }
-            }
-        }
-
-        return $middleware;
-    }
-
-    /**
      * Sorts access group names in the order of consistentapi.accesses.
      *
-     * Makes the middleware order and the group comments in Routes.php independent of the option order.
+     * Makes the Route::access() groups of Routes.php independent of the option order.
      *
      * @param  list<string>  $names  Access group names
      *

@@ -1,6 +1,6 @@
 ---
 name: consistent-api-modules
-description: "Scaffold and organize API modules with adonyarik/consistent-api — the consistent:create and consistent:rebuild Artisan commands, the app/Modules/{Plural} layout, module Routes.php files, access groups from consistentapi.accesses on routes, UUID route keys and the package config. Use when adding a new API resource or CRUD endpoints, changing or protecting module routes, moving app/Models and app/Http classes into modules, or editing config/consistentapi.php."
+description: "Scaffold and organize API modules with adonyarik/consistent-api — the consistent:create and consistent:rebuild Artisan commands, the app/Modules/{Plural} layout, module Routes.php files, access groups from consistentapi.accesses on routes and the Route::access() macro, UUID route keys and the package config. Use when adding a new API resource or CRUD endpoints, changing or protecting module routes, moving app/Models and app/Http classes into modules, or editing config/consistentapi.php."
 ---
 
 # Consistent API: modules
@@ -75,22 +75,22 @@ List options take comma-separated values or repeat (`--routes=get --routes=post`
 
 - `all-verified` applies to every selected route; methods missing from `--routes` are skipped.
 - An entry for a method replaces `all` for that method; several entries for one method are merged. `--accesses=all-admin,get-guest` keeps reads public (`guest` is an empty group) and puts writes behind `admin`.
-- `get` covers `index` and `show`. `put` and `patch` share `update()`, so they must end up with the same middleware.
+- `get` covers `index` and `show`. `put` and `patch` share `update()` (one `Route::match()` line), so they must end up with the same groups.
 - The method is case-insensitive, the group name is taken as is, and the entry splits at the first dash (`delete-super-admin` → group `super-admin`).
-- A route gets the union of its groups' middleware in config order, without duplicates. Routes without middleware are written at the top level; the rest are grouped by identical middleware with a comment naming the groups of all routes in the group:
+- Routes are protected with the `Route::access()` macro (below), never with copied middleware. Routes without groups are written at the top level; the rest are grouped by identical groups (config order), one `Route::access(...)->group()` block per set, `guest` included:
 
 ```php
-// verified
-Route::middleware(['auth:sanctum', 'verified'])->group(function () {
+Route::access('verified')->group(function () {
     Route::get('posts', [PostController::class, 'index'])->name('posts.index');
     Route::get('posts/{post}', [PostController::class, 'show'])->whereUuid('post')->name('posts.show');
 });
 
-// admin
-Route::middleware(['auth:sanctum', 'verified', 'can:admin'])->group(function () {
+Route::access('admin')->group(function () {
     Route::delete('posts/{post}', [PostController::class, 'destroy'])->whereUuid('post')->name('posts.destroy');
 });
 ```
+
+The routes get the groups' current middleware when they register, so changing a group in the config changes every module generated with it. Protect hand-written routes the same way.
 
 ### UUID route keys (`--uuid`)
 
@@ -108,7 +108,7 @@ All option problems are printed together and nothing is written (exit code 1):
 - `Unknown --routes value "head" …`, `Unknown --resources value "x" …` (also next to `all`), `--routes must list at least one of …`.
 - `Invalid --accesses value "admin", expected method-access …`, `Unknown method "fetch" in --accesses …`, `Method "post" in --accesses is not selected in --routes.`, `Access name "…" in --accesses may contain only letters, digits and _ . : -`.
 - `Access "x" is not defined in consistentapi.accesses (config/consistentapi.php). Publish it …`, `Access group "x" in consistentapi.accesses must be an array of middleware names.`
-- `put and patch both route to update() and must have the same middleware …`.
+- `put and patch both route to update() and must have the same access groups …`.
 - `--uuid requires consistentapi.uuid to be true.`, `--uuid requires consistentapi.uuid_column to be a column name.`
 - `File already exists: … (use --force to overwrite)`.
 - `Module Data already holds the model Datum …` — even with `--force`.
@@ -135,7 +135,26 @@ The package ships the section with these lines commented out: declare your own g
 - global HTTP kernel middleware never grant a group; an empty group is granted to every route;
 - hierarchies come for free: a route with every `admin` middleware also has `verified`.
 
-Groups protect generated routes (`--accesses`) and restrict filter/sort columns (`accesses:` on `#[Filterable]` / `#[Sortable]`). In code: `app(\Adonyarik\ConsistentApi\Support\AccessResolver::class)->current()` (groups of the current route, `[]` outside HTTP) or `->forRoute($route)`.
+Groups protect routes (`Route::access()`, `--accesses`) and restrict filter/sort columns (`accesses:` on `#[Filterable]` / `#[Sortable]`). In code: `app(\Adonyarik\ConsistentApi\Support\AccessResolver::class)->current()` (groups of the current route, `[]` outside HTTP) or `->forRoute($route)`.
+
+### `Route::access()`
+
+Always protect routes by group name, never by copying a group's middleware into a route file:
+
+```php
+Route::access('verified')->group(function () {
+    Route::get('posts', [PostController::class, 'index'])->name('posts.index');
+    Route::delete('posts/{post}', [PostController::class, 'destroy'])->access('admin')->name('posts.destroy');
+});
+
+Route::access('admin')->prefix('admin')->middleware('throttle:10,1')->group(function () { /* … */ });
+```
+
+- `Route::access(...)` puts the group's middleware on the routes, as `Route::middleware([...])` would, so the route has that group for `#[Filterable]` / `#[Sortable]` restrictions. It returns a registrar: chain `group()`, `get()`, `prefix()`, `name()`, …; `->middleware()` after it adds instead of replacing (Laravel's own registrar replaces).
+- `Route::prefix('x')->access('admin')` keeps the attributes set before; `Route::get(...)->access('admin')` adds to one route only what its groups lack.
+- Several groups: `access('verified', 'admin')` or `access([...])` — union of middleware, config order, no duplicates.
+- An unknown group, a group that is not a list of middleware names, or no group throws `InvalidAccessException` while the routes register (every request and `route:list` fail until it is fixed).
+- The middleware are read when the routes register: after changing a group, rebuild the route cache.
 
 ## `consistent:rebuild`
 

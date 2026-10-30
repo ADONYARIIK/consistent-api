@@ -35,8 +35,10 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  * action in $resourceClasses, or $resourceClass, and relations listed in $relationFunctions are eager
  * loaded. The index filters, sorts and paginates by the model's #[Filterable] / #[Sortable] declarations
  * and the access groups of the request's route. Every *Logic() method authorizes its action through
- * authorizeAction() first, which uses the model's policy when there is one. Like a controller of a Laravel
- * application, it extends Illuminate\Routing\Controller with AuthorizesRequests and ValidatesRequests.
+ * authorizeAction() first, which uses the model's policy when there is one. Protected hooks let a subclass
+ * or a trait shared by several controllers change the logic without rewriting it: indexQuery() scopes the
+ * index query, beforeStore() and beforeUpdate() adjust the model before it is saved. Like a controller of a
+ * Laravel application, it extends Illuminate\Routing\Controller with AuthorizesRequests and ValidatesRequests.
  *
  * @package Adonyarik\ConsistentApi\Controllers
  * @author Yaroslav Tyrchenko <tyrchenkoy@gmail.com>
@@ -140,11 +142,65 @@ class ConsistentController extends IlluminateController
     }
 
     /**
+     * Base query of indexLogic(), before the requested filters and sorts.
+     *
+     * buildFilterSortQuery() passes it $model::query() and applies the filter() and sort() scopes to what it
+     * returns, so constraints added here hold whatever the client sends: filters only narrow the result,
+     * and the pagination meta counts only the rows the query allows. Override it to scope the list, for
+     * example to the records of the current user in a trait shared by the controllers of personal modules,
+     * or to add withCount() or select(). Qualify the columns you name ($query->qualifyColumn('user_id')),
+     * since scopes may join other tables, and wrap orWhere() conditions in where(fn (Builder $query) => ...),
+     * or the requested filters attach to the last of them only. An orderBy() added here comes before the
+     * requested sorts. The default returns the query unchanged.
+     *
+     * @param  Builder<ConsistentModel>  $query  New query of the listed model
+     * @param  BaseSearchRequest  $request  Search request of the index action
+     *
+     * @return Builder<ConsistentModel> The query to filter, sort and paginate
+     *
+     * @see ConsistentController::buildFilterSortQuery()
+     */
+    protected function indexQuery(Builder $query, BaseSearchRequest $request): Builder
+    {
+        return $query;
+    }
+
+    /**
+     * Adjusts a new model in storeLogic() right before it is saved.
+     *
+     * Runs after authorization and after the model is filled with $request->validated(), so attributes set
+     * here take precedence over the client's input: the owner ($model->user()->associate($request->user())),
+     * defaults, values derived from the input. Unlike attributes set on the instance before storeLogic() is
+     * called, it applies to every action of the controller that calls storeLogic(), which suits a trait
+     * shared by several controllers. Throw an HttpException to refuse the write. The default does nothing.
+     *
+     * @param  FormRequest  $request  Store request of the action
+     * @param  Model  $model  New model, filled and not saved yet
+     *
+     * @see ConsistentController::storeLogic()
+     */
+    protected function beforeStore(FormRequest $request, Model $model): void {}
+
+    /**
+     * Adjusts the model in updateLogic() right before it is saved.
+     *
+     * Runs after authorization and after the model is filled with $request->validated(), so attributes set
+     * here take precedence over the client's input, and isDirty() / getOriginal() tell what the request
+     * changes. Throw an HttpException to refuse the write. The default does nothing.
+     *
+     * @param  FormRequest  $request  Update request of the action
+     * @param  Model  $model  Route-bound model, filled and not saved yet
+     *
+     * @see ConsistentController::updateLogic()
+     */
+    protected function beforeUpdate(FormRequest $request, Model $model): void {}
+
+    /**
      * Lists models filtered, sorted and paginated by the search request.
      *
      * Authorizes viewAny, takes the validated input except id, resolves the access groups of the request's
-     * route and builds the query with buildFilterSortQuery(), which answers 422 for a column or operator
-     * the route may not use. The rows are ordered by the primary key after the requested sorts, so pages
+     * route and builds the query with buildFilterSortQuery(), which starts from indexQuery() and answers 422
+     * for a column or operator the route may not use. The rows are ordered by the primary key after the requested sorts, so pages
      * never overlap or skip rows. Returns page `page` of perpage items (the model's $perPage when absent)
      * as a PaginatedJsonResponse. A model implementing WithoutPaginationModelContract returns the rows
      * under the data container without meta when the request has paginate=false, at most
@@ -160,6 +216,7 @@ class ConsistentController extends IlluminateController
      * @throws ValidationException 422 for a column or operator the route may not filter or sort by, or a value of the wrong shape or type
      * @throws AuthorizationException When the policy denies viewAny
      *
+     * @see ConsistentController::indexQuery()
      * @see ConsistentController::buildFilterSortQuery()
      * @see AccessResolver::forRoute()
      * @see PaginatedJsonResponse
@@ -174,7 +231,7 @@ class ConsistentController extends IlluminateController
         $accesses = app(AccessResolver::class)->forRoute($request->route());
 
         // The primary key breaks ties, so LIMIT / OFFSET pages are stable
-        $query = $this->buildFilterSortQuery($filters, $model, $accesses)->orderBy($model->getQualifiedKeyName());
+        $query = $this->buildFilterSortQuery($request, $filters, $model, $accesses)->orderBy($model->getQualifiedKeyName());
 
         try {
             if ($model instanceof WithoutPaginationModelContract
@@ -235,11 +292,12 @@ class ConsistentController extends IlluminateController
     /**
      * Creates a model from the validated input and answers 201 Created.
      *
-     * Authorizes create, then fills the given instance with $request->validated() and saves it. Only
-     * fillable attributes are mass-assigned, and attributes set on the instance beforehand are kept, so the
-     * caller can set what must not come from the client: $post = new Post; $post->author()->associate($request->user());
-     * return $this->storeLogic($request, $post). The new model is returned in the action's resource with
-     * $relationFunctions loaded. A save cancelled by a model event answers 409.
+     * Authorizes create, then fills the given instance with $request->validated(), runs beforeStore() and
+     * saves it. Only fillable attributes are mass-assigned, and attributes set on the instance beforehand
+     * are kept, so the caller can set what must not come from the client: $post = new Post;
+     * $post->author()->associate($request->user()); return $this->storeLogic($request, $post). The new
+     * model is returned in the action's resource with $relationFunctions loaded. A save cancelled by a model
+     * event answers 409.
      *
      * @param  FormRequest  $request  Store request of the action
      * @param  Model  $model  New, unsaved instance of the model to create
@@ -250,6 +308,7 @@ class ConsistentController extends IlluminateController
      * @throws HttpException 409 when a creating or saving listener cancels the save
      * @throws LogicException When the model already exists
      *
+     * @see ConsistentController::beforeStore()
      * @see ConsistentController::writeRefused()
      */
     public function storeLogic(FormRequest $request, Model $model): JsonResponse
@@ -260,7 +319,10 @@ class ConsistentController extends IlluminateController
 
         $this->authorizeAction('create', $model::class);
 
-        if (! $model->fill($request->validated())->save()) {
+        $model->fill($request->validated());
+        $this->beforeStore($request, $model);
+
+        if (! $model->save()) {
             $this->writeRefused('The record was not created.');
         }
 
@@ -272,10 +334,10 @@ class ConsistentController extends IlluminateController
     /**
      * Updates the route-bound model with the validated input.
      *
-     * Answers 404 for a model that does not exist, authorizes update, fills and saves
-     * $request->validated() (fillable attributes only), loads $relationFunctions and returns the model in
-     * the action's resource with status 200. A save cancelled by a model event answers 409, so the client
-     * never sees values that were not stored.
+     * Answers 404 for a model that does not exist, authorizes update, fills it with $request->validated()
+     * (fillable attributes only), runs beforeUpdate() and saves it, loads $relationFunctions and returns the
+     * model in the action's resource with status 200. A save cancelled by a model event answers 409, so the
+     * client never sees values that were not stored.
      *
      * @param  FormRequest  $request  Update request of the action
      * @param  Model  $model  Route-bound model to update
@@ -286,6 +348,7 @@ class ConsistentController extends IlluminateController
      * @throws AuthorizationException When the policy denies update
      *
      * @see ConsistentController::ensureExists()
+     * @see ConsistentController::beforeUpdate()
      * @see ConsistentController::writeRefused()
      */
     public function updateLogic(FormRequest $request, Model $model): JsonResource
@@ -293,7 +356,10 @@ class ConsistentController extends IlluminateController
         $this->ensureExists($model);
         $this->authorizeAction('update', $model);
 
-        if (! $model->fill($request->validated())->save()) {
+        $model->fill($request->validated());
+        $this->beforeUpdate($request, $model);
+
+        if (! $model->save()) {
             $this->writeRefused('The record was not updated.');
         }
 
@@ -391,9 +457,11 @@ class ConsistentController extends IlluminateController
      * takes operators only, not a scalar value, and each operator value must have the shape
      * filterValueError() accepts: a single value, a list for `in` / `not_in`, a date for `from` / `to`, a
      * boolean for `null`. Empty values mean "not set" and are not checked. The checks do not depend on the
-     * search request's rules, so the query never runs with unchecked input. Valid input is applied through
-     * the sort() and filter() scopes, and $relationFunctions are eager loaded.
+     * search request's rules, so the query never runs with unchecked input. The query starts from
+     * indexQuery(), valid input is applied through the sort() and filter() scopes, and $relationFunctions
+     * are eager loaded.
      *
+     * @param  BaseSearchRequest  $request  Search request of the index action, passed to indexQuery()
      * @param  array<string, mixed>  $filters  Validated search input with sort and filter keys
      * @param  ConsistentModel  $model  Instance of the listed model
      * @param  list<string>  $accesses  Accesses of the request's route; columns restricted to other groups count as unknown
@@ -402,6 +470,7 @@ class ConsistentController extends IlluminateController
      *
      * @throws ValidationException 422 for a column or operator the accesses do not allow, or a value of the wrong shape
      *
+     * @see ConsistentController::indexQuery()
      * @see CanSort::getAllowedSorts()
      * @see CanSort::scopeSort()
      * @see CanFilter::getAllowedFilters()
@@ -410,9 +479,9 @@ class ConsistentController extends IlluminateController
      * @see CanFilter::scopeFilter()
      * @see ConsistentController::failValidation()
      */
-    private function buildFilterSortQuery(array $filters, ConsistentModel $model, array $accesses): Builder
+    private function buildFilterSortQuery(BaseSearchRequest $request, array $filters, ConsistentModel $model, array $accesses): Builder
     {
-        $query = $model::query();
+        $query = $this->indexQuery($model::query(), $request);
 
         if (is_array($filters['sort'] ?? null)) {
             $allowedSorts = $model->getAllowedSorts($accesses);

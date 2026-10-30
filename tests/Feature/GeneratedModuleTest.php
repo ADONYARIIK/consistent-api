@@ -19,6 +19,14 @@ class GeneratedModuleTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function defineEnvironment($app): void
+    {
+        $app['config']->set('consistentapi.accesses', [
+            'guest' => [],
+            'admin' => ['auth:sanctum', 'can:admin'],
+        ]);
+    }
+
     protected function defineDatabaseMigrations(): void
     {
         Schema::create('posts', function ($table) {
@@ -37,8 +45,15 @@ class GeneratedModuleTest extends TestCase
 
     public function test_uuid_module_serves_crud_requests(): void
     {
+        $this->stubMiddlewareAliases('auth', 'can');
+
         // index goes through PostLightResource, show and update through PostResource, which inherits the id from it
-        $this->artisan('consistent:create', ['model' => 'Post', '--uuid' => true, '--resources' => ['all']])->assertSuccessful();
+        $this->artisan('consistent:create', [
+            'model' => 'Post',
+            '--uuid' => true,
+            '--resources' => ['all'],
+            '--accesses' => ['get-guest,delete-admin'],
+        ])->assertSuccessful();
 
         spl_autoload_register(function (string $class) {
             $prefix = 'App\\Modules\\';
@@ -52,6 +67,11 @@ class GeneratedModuleTest extends TestCase
 
         Route::middleware('api')->prefix('api')->group(app_path('Modules/Posts/Routes.php'));
         app('router')->getRoutes()->refreshNameLookups();
+
+        // Route::access() in the generated file puts the middleware of the groups on the routes
+        $this->assertSame(['api'], Route::getRoutes()->getByName('posts.index')?->middleware());
+        $this->assertSame(['api'], Route::getRoutes()->getByName('posts.store')?->middleware());
+        $this->assertSame(['api', 'auth:sanctum', 'can:admin'], Route::getRoutes()->getByName('posts.destroy')?->middleware());
 
         $uuid = $this->postJson('/api/posts')->assertCreated()->json('id');
 
