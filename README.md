@@ -25,6 +25,7 @@ Namespace: `Adonyarik\ConsistentApi`
     - [Filters (`consistentapi.filters`)](#filters-consistentapifilters)
     - [Access groups (`consistentapi.accesses`)](#access-groups-consistentapiaccesses)
   - [Modular structure](#modular-structure)
+    - [API on its own host](#api-on-its-own-host)
     - [Rate limiting](#rate-limiting)
   - [Artisan commands](#artisan-commands)
     - [`consistent:create`](#consistentcreate)
@@ -105,10 +106,11 @@ This creates `config/consistentapi.php`. Every setting of the package lives unde
 | `modules_folder`       | `Modules`   | Modules directory relative to `app/`. Every segment must be a PHP identifier (`Modules`, `Domain/Modules`); backslashes count as slashes. An invalid value (empty, `..`, `my-modules`) is an error |
 | `request_limit`        | `60`        | Max requests per minute for the `api` rate limiter  |
 | `api_url_prefix`       | `api`       | URL prefix for module routes, also matched by `ApiJsonMiddleware` |
+| `api_domain`           | `null`      | Host of module routes, also matched by `ApiJsonMiddleware`; `null` means every host. See [API on its own host](#api-on-its-own-host) |
 | `middlewares`          | `['api']`   | Middleware stack applied to module routes           |
 | `api_json_enabled`     | `true`      | Prepends `ApiJsonMiddleware` to the global middleware; `false` leaves it to you |
 | `without_wrapping`     | `true`      | Calls `JsonResource::withoutWrapping()` for the whole application; `false` keeps the `data` wrapper |
-| `hide_model_not_found` | `true`      | With `app.debug` off, a missing route-bound model under the API prefix answers `{"message": "Not found."}` instead of naming its class |
+| `hide_model_not_found` | `true`      | With `app.debug` off, a missing route-bound model under the API prefix (and on `api_domain`, when set) answers `{"message": "Not found."}` instead of naming its class |
 | `uuid`                 | `true`      | Allows `consistent:create --uuid`; with `false` the flag is an error |
 | `uuid_column`          | `public_id` | UUID column that `--uuid` modules use as the route key |
 
@@ -200,6 +202,7 @@ Module folders use the **plural** StudlyCase name of the model (`Post` → `Post
 Each module `Routes.php` (and the optional root `Routes.php`) is loaded with:
 
 - prefix from `consistentapi.api_url_prefix` (e.g. `api`)
+- host from `consistentapi.api_domain`, when it is set (e.g. `api.example.com`)
 - middleware from `consistentapi.middlewares` (e.g. `api`)
 
 The module files are loaded once the application has booted, after the routes `bootstrap/app.php` registers with `withRouting()`, in the alphabetical order of the module folders, so the order is the same on every machine. Route files of the application are loaded once, as without the package. When the routes are cached (`php artisan route:cache`), the cache already holds the module routes and the files are not read.
@@ -209,6 +212,42 @@ The module files are loaded once the application has booted, after the routes `b
 A folder named `Middleware` inside the modules directory is skipped.
 
 If the modules directory does not exist, the provider **does not fail** — routes are simply not loaded. An invalid `modules_folder` (see [General settings](#general-settings)) throws an `InvalidArgumentException`.
+
+> **A catch-all route can take the URLs of the API.** Module routes are registered after the routes of `bootstrap/app.php`, and the first route that matches wins. With `api_domain` unset, a route without a domain such as `Route::get('/{any}', …)->where('any', '.*')` therefore answers every API URL, and the module routes are never reached. Giving only the catch-all a domain does not help, because Laravel checks routes with a domain first. `Route::fallback()` does help: Laravel tries it after all other routes, so only unknown URLs reach it, those of the API included.
+>
+> With [`api_domain`](#api-on-its-own-host) set, the module routes are checked first, but unknown URLs of the API host still reach a catch-all without a domain and get its answer instead of a JSON `404`. Give the catch-all the domain of the site:
+>
+> ```php
+> Route::domain('example.com')->group(function () {
+>     Route::get('/{any}', SpaController::class)->where('any', '.*');
+> });
+> ```
+
+### API on its own host
+
+`consistentapi.api_domain` limits the module routes to one host. Domain and prefix work together:
+
+| `api_domain`      | `api_url_prefix` | API requests                       |
+| ----------------- | ---------------- | ---------------------------------- |
+| `null`            | `api`            | `/api/*` on any host (the default) |
+| `api.example.com` | empty            | everything on that host            |
+| `api.example.com` | `v1`             | only `/v1/*` on that host          |
+
+```php
+// config/consistentapi.php
+'api_url_prefix' => '',
+'api_domain' => env('API_DOMAIN'), // api.example.com
+```
+
+`Route::get('posts', …)` in a module now serves `https://api.example.com/posts`; with the default prefix it would serve `https://api.example.com/api/posts`. On any other host the module routes answer `404`, and `route('posts.index')` generates a URL on the API host whichever host the request came to.
+
+The setting also narrows what counts as an API request: [`ApiJsonMiddleware`](#json-for-api-urls) and `hide_model_not_found` apply to requests to that host only, so with an empty prefix the other hosts of the application keep their HTML pages. `routes/api.php` and the other routes of the application still answer on every host; off the API host they do not get JSON errors.
+
+- The value is a bare host. Case does not matter, and the port of the request is ignored: `api.example.com` also serves `api.example.com:8000`.
+- `https://api.example.com` and `{tenant}.example.com` do not work as you would expect: the routes answer, but the requests do not count as API requests, so their errors are not JSON. A route parameter is also passed to every action. With a port or a trailing slash (`api.example.com:8000`, `api.example.com/`) the routes answer `404`.
+- Behind a reverse proxy, the proxy must send the public host in the `Host` header (`proxy_set_header Host $host;` in nginx). `ApiJsonMiddleware` runs before `TrustProxies` and does not see `X-Forwarded-Host`: with that header alone the routes answer, but errors come as HTML.
+- The route cache holds the host, so run `php artisan route:cache` after changing it.
+- Feature tests send requests to `localhost`, where the module routes answer `404`. Pass the full URL (`$this->getJson('http://api.example.com/posts')`) or leave `API_DOMAIN` empty in the testing environment.
 
 ### Rate limiting
 
@@ -437,7 +476,7 @@ php artisan consistent:rebuild --rollback  # undo the last run
 - Blade templates, JSON fixtures and other files that are not plain PHP are not rewritten: the command lists every line of `resources/`, `database/`, `tests/` and `config/` that names a moved class.
 - Generated caches (`bootstrap/cache`) are left alone: run `php artisan optimize:clear` and `composer dump-autoload` afterwards; the command prints this checklist.
 - A file declaring several classes is not moved, and neither are the classes it declares; the command lists them.
-- Moved routes get the prefix and middleware of `config/consistentapi.php` (`api_url_prefix`, `middlewares`) instead of those `bootstrap/app.php` gives `routes/api.php`. With the defaults (`api`, `['api']`) nothing changes.
+- Moved routes get the prefix, host and middleware of `config/consistentapi.php` (`api_url_prefix`, `api_domain`, `middlewares`) instead of those `bootstrap/app.php` gives `routes/api.php`. With the defaults (`api`, `null`, `['api']`) nothing changes.
 
 ---
 
@@ -1042,7 +1081,7 @@ Without pagination (contract + `paginate=false`, at most `unpaginated_limit` row
 
 Single resources (`show`, `store`, `update`) are returned without a `data` wrapper, since the package calls `JsonResource::withoutWrapping()` (see [Installation](#installation)).
 
-With `app.debug` off, a missing route-bound model under the API prefix answers `404 {"message": "Not found."}` instead of Laravel's `No query results for model [App\…\Post] 1`, which names the class; set `consistentapi.hide_model_not_found` to `false` to keep Laravel's message.
+With `app.debug` off, a missing route-bound model under the API prefix (and on `api_domain`, when set) answers `404 {"message": "Not found."}` instead of Laravel's `No query results for model [App\…\Post] 1`, which names the class; set `consistentapi.hide_model_not_found` to `false` to keep Laravel's message.
 
 ---
 
@@ -1052,13 +1091,13 @@ Aliases are registered automatically:
 
 | Alias                          | Class                        | Purpose                                                  |
 | -------------------------------- | ------------------------------ | ----------------------------------------------------------- |
-| `consistent.api-json`          | `ApiJsonMiddleware`          | Asks for JSON on API-prefixed URLs whose client prefers no specific type |
+| `consistent.api-json`          | `ApiJsonMiddleware`          | Asks for JSON on API URLs whose client prefers no specific type |
 | `consistent.ensure-json`       | `EnsureJsonMiddleware`       | Requires a JSON Content-Type for `POST` / `PUT` / `PATCH` requests with a body |
 | `consistent.ensure-multipart`  | `EnsureMultipartMiddleware`  | Requires `multipart/form-data` for `POST`                |
 
 ### JSON for API URLs
 
-`ApiJsonMiddleware` is prepended to the global middleware automatically. It runs before routing and before the other global middleware, so everything under the API prefix gets JSON errors, including `404` for unknown URLs, `405`, `413` and maintenance mode. URLs outside the prefix are left alone.
+`ApiJsonMiddleware` is prepended to the global middleware automatically. It runs before routing and before the other global middleware, so everything under the API prefix (and on `api_domain`, when set) gets JSON errors, including `404` for unknown URLs, `405`, `413` and maintenance mode. Other URLs and other hosts are left alone.
 
 It sets `Accept: application/json` only when the client prefers no specific type: no `Accept` header, `*/*`, or HTML first, as browsers send it. A client asking for JSON (`application/vnd.api+json`) or for another type (`text/csv` for an export, `application/pdf`) keeps its header, so content negotiation and `$request->accepts()` work under the prefix.
 
@@ -1081,7 +1120,7 @@ Attach `EnsureMultipartMiddleware` only to upload endpoints: any non-POST reques
 
 `EnsureJsonMiddleware` checks only requests that carry a body: an action endpoint such as `POST /posts/1/publish` without a body passes, whatever its `Content-Type`. A body that is not JSON returns `415 {"message": …}`.
 
-`ApiJsonMiddleware` covers `/{api_url_prefix}` and everything under it; slashes around the prefix are ignored, as for the module routes, and a nested prefix such as `api/v1` works. With an empty prefix the API is the whole application, so it applies to every request.
+`ApiJsonMiddleware` covers `/{api_url_prefix}` and everything under it; slashes around the prefix are ignored, as for the module routes, and a nested prefix such as `api/v1` works. With an empty prefix and no `api_domain` the API is the whole application, so it applies to every request. With `api_domain` set it covers requests to that host only, so an empty prefix makes that host the API and leaves the others alone; see [API on its own host](#api-on-its-own-host).
 
 ---
 

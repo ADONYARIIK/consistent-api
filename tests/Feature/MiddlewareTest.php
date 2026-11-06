@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use Adonyarik\ConsistentApi\Middleware\ApiJsonMiddleware;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Router;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Fixtures\Book;
 use Tests\TestCase;
 
 class MiddlewareTest extends TestCase
@@ -20,6 +22,7 @@ class MiddlewareTest extends TestCase
 
         $router->get('api/accept', $echoAccept)->middleware('consistent.api-json');
         $router->get('web/accept', $echoAccept)->middleware('consistent.api-json');
+        $router->get('api/missing-model', fn () => throw (new ModelNotFoundException)->setModel(Book::class, [1]));
 
         $router->match(['get', 'post', 'put', 'patch', 'delete'], 'json-only', fn () => 'ok')->middleware('consistent.ensure-json');
         $router->match(['get', 'post', 'put'], 'upload', fn () => 'ok')->middleware('consistent.ensure-multipart');
@@ -89,6 +92,61 @@ class MiddlewareTest extends TestCase
         foreach ($html as $path) {
             $this->assertFalse($this->acceptsJson($path), $path);
         }
+    }
+
+    /**
+     * @return array<string, array{string|null, string, list<string>, list<string>}> Domain, prefix, URLs asking for JSON, URLs that do not
+     */
+    public static function domains(): array
+    {
+        $api = 'http://api.example.com';
+        $other = 'http://other.test';
+
+        return [
+            'no domain' => [null, 'api', [$api.'/api/accept', $other.'/api/accept'], [$api.'/web/accept', $other.'/web/accept']],
+            'empty domain' => ['', 'api', [$api.'/api/accept', $other.'/api/accept'], [$other.'/web/accept']],
+            'domain, empty prefix' => ['api.example.com', '', [$api.'/accept', $api.'/'], [$other.'/accept', $other.'/']],
+            'domain and prefix' => ['api.example.com', 'v1', [$api.'/v1/accept', $api.'/v1'], [$api.'/accept', $other.'/v1/accept']],
+            'case of the domain' => ['API.Example.COM', 'api', [$api.'/api/accept', 'http://API.EXAMPLE.COM/api/accept'], [$other.'/api/accept']],
+            'port of the request' => ['api.example.com', 'api', [$api.':8000/api/accept'], [$other.':8000/api/accept']],
+            'query named like the host' => ['api.example.com', 'api', [], [$other.'/api/accept?getHost=api.example.com']],
+        ];
+    }
+
+    /**
+     * @param  list<string>  $json
+     * @param  list<string>  $html
+     */
+    #[DataProvider('domains')]
+    public function test_api_json_matches_the_domain_and_the_prefix_together(?string $domain, string $prefix, array $json, array $html): void
+    {
+        config(['consistentapi.api_domain' => $domain, 'consistentapi.api_url_prefix' => $prefix]);
+
+        foreach ($json as $url) {
+            $this->assertTrue($this->acceptsJson($url), $url);
+        }
+
+        foreach ($html as $url) {
+            $this->assertFalse($this->acceptsJson($url), $url);
+        }
+    }
+
+    public function test_api_json_runs_globally_so_only_the_domain_gets_json_errors(): void
+    {
+        config(['consistentapi.api_domain' => 'api.example.com']);
+
+        $this->get('http://api.example.com/api/missing')->assertNotFound()->assertHeader('Content-Type', 'application/json');
+
+        $this->assertStringNotContainsString('json', (string) $this->get('http://other.test/api/missing')->assertNotFound()->headers->get('Content-Type'));
+    }
+
+    public function test_hiding_model_names_follows_the_domain(): void
+    {
+        config(['consistentapi.api_domain' => 'api.example.com', 'app.debug' => false]);
+
+        $this->getJson('http://api.example.com/api/missing-model')->assertNotFound()->assertExactJson(['message' => 'Not found.']);
+
+        $this->assertStringContainsString(Book::class, (string) $this->getJson('http://other.test/api/missing-model')->assertNotFound()->json('message'));
     }
 
     /**

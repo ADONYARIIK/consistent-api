@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use InvalidArgumentException;
+use Orchestra\Testbench\Attributes\DefineEnvironment;
 use ReflectionMethod;
 use Tests\TestCase;
 
@@ -86,6 +87,59 @@ class ModuleRoutesTest extends TestCase
     {
         $this->assertNull(Route::getRoutes()->getByName('module.hidden'));
         $this->get('/v1/hidden')->assertNotFound();
+    }
+
+    public function test_routes_answer_on_every_host_without_a_domain(): void
+    {
+        foreach (['http://localhost', 'http://api.example.com', 'http://other.test'] as $host) {
+            $this->get($host.'/v1/books')->assertOk()->assertSee('books');
+        }
+
+        $this->assertNull(Route::getRoutes()->getByName('module.books')->getDomain());
+    }
+
+    #[DefineEnvironment('useApiDomain')]
+    public function test_routes_answer_on_their_domain_only(): void
+    {
+        // Every route file gets the domain: the modules and the folder's own Routes.php
+        $this->get('http://api.example.com/v1/books')->assertOk()->assertSee('books');
+        $this->get('http://api.example.com/v1/zeta')->assertOk()->assertSee('zeta');
+        $this->get('http://api.example.com/v1/global')->assertOk()->assertSee('global');
+
+        $this->get('http://other.test/v1/books')->assertNotFound();
+        $this->get('http://other.test/v1/global')->assertNotFound();
+        $this->get('/v1/books')->assertNotFound();
+
+        $this->assertSame('http://api.example.com/v1/books', route('module.books'));
+    }
+
+    #[DefineEnvironment('useApiDomain')]
+    public function test_domain_and_prefix_work_together(): void
+    {
+        $this->get('http://api.example.com/v1/books')->assertOk();
+        $this->get('http://api.example.com/books')->assertNotFound();
+        $this->get('http://other.test/v1/books')->assertNotFound();
+
+        $route = Route::getRoutes()->getByName('module.books');
+
+        $this->assertSame('api.example.com', $route->getDomain());
+        $this->assertSame('v1/books', $route->uri());
+        $this->assertSame(['api'], $route->middleware());
+    }
+
+    public function test_domain_with_an_empty_prefix_serves_the_root_of_its_host(): void
+    {
+        // defineEnvironment() runs after #[DefineEnvironment] and sets the prefix back, so the routes load again here
+        config(['consistentapi.api_domain' => 'api.example.com', 'consistentapi.api_url_prefix' => '']);
+        (new ReflectionMethod(ModuleServiceProvider::class, 'loadModuleRoutes'))->invoke(new ModuleServiceProvider($this->app));
+
+        $this->get('http://api.example.com/books')->assertOk()->assertSee('books');
+        $this->get('http://other.test/books')->assertNotFound();
+    }
+
+    protected function useApiDomain($app): void
+    {
+        $app['config']->set('consistentapi.api_domain', 'api.example.com');
     }
 
     public function test_api_limiter_uses_the_configured_limit_per_user_or_ip(): void

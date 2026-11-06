@@ -16,7 +16,7 @@ use InvalidArgumentException;
  * Loads the routes of the modules and defines the api rate limiter.
  *
  * Every module keeps its routes in app/{modules_folder}/{Module}/Routes.php; this provider registers them
- * with the API prefix and middleware from config/consistentapi.php, so routes/api.php does not list
+ * with the API prefix, host and middleware from config/consistentapi.php, so routes/api.php does not list
  * them. ConsistentApiProvider registers it.
  *
  * It is a plain ServiceProvider on purpose: a subclass of Laravel's RouteServiceProvider would also load
@@ -55,9 +55,10 @@ class ModuleServiceProvider extends ServiceProvider
      *
      * Walks the direct subfolders of app/{consistentapi.modules_folder} in name order, so routes register
      * in the same order on every machine, skips one named Middleware, and loads each {Module}/Routes.php,
-     * then the folder's own Routes.php, all with the consistentapi.middlewares middleware and the
-     * consistentapi.api_url_prefix prefix. Nothing happens when the folder does not exist. Name and action
-     * lookups are refreshed afterwards, since route names are set after the routes are added.
+     * then the folder's own Routes.php, all with the consistentapi.middlewares middleware, the
+     * consistentapi.api_url_prefix prefix and, when set, the consistentapi.api_domain host. Nothing happens
+     * when the folder does not exist. Name and action lookups are refreshed afterwards, since route names
+     * are set after the routes are added.
      *
      * @throws InvalidArgumentException When consistentapi.modules_folder is not a valid folder
      *
@@ -92,10 +93,17 @@ class ModuleServiceProvider extends ServiceProvider
         /** @var Router $router */
         $router = $this->app['router'];
         $prefix = config('consistentapi.api_url_prefix', '');
+        $domain = config('consistentapi.api_domain');
         $middlewares = config('consistentapi.middlewares', []);
 
         foreach ($routeFiles as $routeFile) {
-            $router->middleware($middlewares)->prefix($prefix)->group($routeFile);
+            $routes = $router->middleware($middlewares)->prefix($prefix);
+
+            if (filled($domain)) {
+                $routes->domain($domain);
+            }
+
+            $routes->group($routeFile);
         }
 
         $router->getRoutes()->refreshNameLookups();

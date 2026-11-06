@@ -134,7 +134,7 @@ trait OwnedByUser // for controllers of modules whose records belong to a user
 - A model implementing `Adonyarik\ConsistentApi\Contracts\WithoutPaginationModelContract` (no methods) returns `{"items": [...]}` without `meta` when the request has `paginate=false` or `0`, at most `consistentapi.pagination.unpaginated_limit` (1000) rows. Use it for short dictionaries.
 - `meta.path` comes from the request's `Host` header; enable `$middleware->trustHosts()` in production.
 - Validation errors from `indexLogic()` are standard 422 `{"message": "<first error>", "errors": {"filter.x": […]}}`, like a failed form request.
-- With `app.debug` off, a missing route-bound model under the API prefix is `404 {"message": "Not found."}` (`consistentapi.hide_model_not_found`).
+- With `app.debug` off, a missing route-bound model under the API prefix (and on `api_domain`, when set) is `404 {"message": "Not found."}` (`consistentapi.hide_model_not_found`).
 - `new \Adonyarik\ConsistentApi\Responses\PaginatedJsonResponse($paginator, PostResource::class)` builds the paginated shape for your own queries; it takes any `LengthAwarePaginator` contract and merges the collection's `with()` / `additional()` data.
 
 ## Scoped and custom list endpoints
@@ -196,7 +196,7 @@ public function show(Post $post, Comment $comment): JsonResource
 
 | Alias                         | Behaviour |
 | ----------------------------- | --------- |
-| `consistent.api-json`         | sets `Accept: application/json` on URLs under `api_url_prefix` unless the client asks for a specific type (`text/csv`, `application/vnd.api+json` are kept; none, `*/*` and browser HTML are replaced); global by default (`api_json_enabled`), so 404 / 405 / 413 / maintenance errors there are JSON |
+| `consistent.api-json`         | sets `Accept: application/json` on URLs under `api_url_prefix` (and on `api_domain`, when set) unless the client asks for a specific type (`text/csv`, `application/vnd.api+json` are kept; none, `*/*` and browser HTML are replaced); global by default (`api_json_enabled`), so 404 / 405 / 413 / maintenance errors there are JSON |
 | `consistent.ensure-json`      | 415 `{"message": …}` for POST / PUT / PATCH with a body but without a JSON `Content-Type`; body-less action requests pass |
 | `consistent.ensure-multipart` | 415 `{"message": …}` for anything but a POST (also POST with `_method=PUT/PATCH`) with `multipart/form-data`; attach only to upload routes |
 
@@ -206,6 +206,10 @@ Route::post('files', UploadController::class)->middleware('consistent.ensure-mul
 ```
 
 With `api_json_enabled = false`, attaching `consistent.api-json` as route middleware leaves unmatched-route 404 / 405 as HTML.
+
+With `consistentapi.api_domain` set, an API request is one to that host under `api_url_prefix` (an empty prefix: everything on the host). Requests to other hosts get neither the JSON `Accept` header nor the hidden model names, whatever their URL.
+
+If module actions never run, or an unknown API URL answers 200 instead of a JSON 404, look for a catch-all route of the app (`Route::get('/{any}', …)->where('any', '.*')`): it matches before the module routes. The `consistent-api-modules` skill has the fix.
 
 ## `Route::development()`
 
@@ -219,7 +223,7 @@ The callback runs only in the `local` environment; elsewhere the routes do not e
 
 ## Feature tests
 
-- Module URLs carry the prefix: `$this->getJson('/api/posts?filter[title]=a&sort[id]=desc&perpage=15')`.
+- Module URLs carry the prefix: `$this->getJson('/api/posts?filter[title]=a&sort[id]=desc&perpage=15')`. With `consistentapi.api_domain` set they also need the host: `$this->getJson('http://api.example.com/api/posts')`.
 - Assert lists with `->assertJsonPath('meta.total', 3)` / `->assertJsonCount(3, 'items')`, single resources without `data.`: `->assertJsonPath('id', $post->id)`.
 - Store returns 201, destroy 204, rejected filter/sort input 422 with `assertJsonValidationErrors(['filter.email'])`, a policy denial 403, a cancelled write 409.
 - Startup validation runs in `testing`: a broken `#[Filterable]` / `#[Sortable]` makes every test fail at boot with the exception message.

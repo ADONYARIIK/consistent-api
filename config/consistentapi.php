@@ -41,6 +41,12 @@ return [
     'api_url_prefix' => 'api',
 
     /*
+    | Host of the module routes and of the requests ApiJsonMiddleware treats as
+    | API requests, without the scheme. Null: the routes answer on every host.
+    */
+    'api_domain' => null,
+
+    /*
     |--------------------------------------------------------------------------
     | Default middlewares
     |--------------------------------------------------------------------------
@@ -57,8 +63,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | Prepends ApiJsonMiddleware to the global middleware, so every request
-    | under the API prefix gets JSON errors, 404 and 405 included. Turn it
-    | off to attach the consistent.api-json alias yourself.
+    | under the API prefix (and on api_domain, when set) gets JSON errors,
+    | 404 and 405 included. Turn it off to attach the consistent.api-json
+    | alias yourself.
     |
     */
 
@@ -84,8 +91,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | With app.debug off, a missing route-bound model under the API prefix
-    | answers {"message": "Not found."} instead of Laravel's
-    | "No query results for model [App\...] 1", which names the class.
+    | (and on api_domain, when set) answers {"message": "Not found."} instead
+    | of Laravel's "No query results for model [App\...] 1", which names the
+    | class.
     |
     */
 

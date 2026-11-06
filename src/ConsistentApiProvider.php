@@ -83,7 +83,7 @@ class ConsistentApiProvider extends ServiceProvider
      * consistent.ensure-multipart middleware aliases and, in the console, consistent:create and
      * consistent:rebuild. With consistentapi.api_json_enabled on, ApiJsonMiddleware is prepended to the
      * global middleware of the HTTP kernel once the kernel is built: it runs before routing and before the
-     * other global middleware, so 404, 405, 413 and maintenance-mode errors under the API prefix are JSON
+     * other global middleware, so 404, 405, 413 and maintenance-mode errors of API requests are JSON
      * too. With consistentapi.without_wrapping on, JsonResource::withoutWrapping() is called: it applies
      * to every resource of the application, not only to the package's.
      *
@@ -162,12 +162,13 @@ class ConsistentApiProvider extends ServiceProvider
     }
 
     /**
-     * Answers {"message": "Not found."} for missing route-bound models under the API prefix.
+     * Answers {"message": "Not found."} for missing route-bound models in API requests.
      *
      * Laravel's 404 for a missing model reads "No query results for model [App\...\Post] 1" even with
      * app.debug off, which tells clients the class names of the application. With
-     * consistentapi.hide_model_not_found on and app.debug off, such a 404 under the API prefix gets the
-     * generic message instead; other 404 responses are left to the application.
+     * consistentapi.hide_model_not_found on and app.debug off, such a 404 under the API prefix (and on
+     * consistentapi.api_domain, when set) gets the generic message instead; other 404 responses are left
+     * to the application.
      *
      * @param  Handler  $handler  Exception handler of the application
      *

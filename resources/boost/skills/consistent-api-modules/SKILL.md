@@ -1,6 +1,6 @@
 ---
 name: consistent-api-modules
-description: "Scaffold and organize API modules with adonyarik/consistent-api — the consistent:create and consistent:rebuild Artisan commands, the app/Modules/{Plural} layout, module Routes.php files, access groups from consistentapi.accesses on routes and the Route::access() macro, UUID route keys and the package config. Use when adding a new API resource or CRUD endpoints, changing or protecting module routes, moving app/Models and app/Http classes into modules, or editing config/consistentapi.php."
+description: "Scaffold and organize API modules with adonyarik/consistent-api — the consistent:create and consistent:rebuild Artisan commands, the app/Modules/{Plural} layout, module Routes.php files, access groups from consistentapi.accesses on routes and the Route::access() macro, UUID route keys and the package config. Use when adding a new API resource or CRUD endpoints, changing or protecting module routes, serving the API from its own host, moving app/Models and app/Http classes into modules, or editing config/consistentapi.php."
 ---
 
 # Consistent API: modules
@@ -24,6 +24,8 @@ app/Modules/                 # consistentapi.modules_folder, relative to app/
 
 - Namespaces follow the folders under the application namespace: `App\Modules\Posts\Models\Post`, `App\Modules\Posts\Controllers\PostController` (`Acme\…` when `composer.json` maps `app/` to `Acme\`).
 - Every `app/Modules/*/Routes.php` and `app/Modules/Routes.php` is loaded automatically, after the app's own routes and in alphabetical module order, with the prefix `consistentapi.api_url_prefix` (`api`) and the middleware `consistentapi.middlewares` (`['api']`). Write URIs without the prefix (`Route::get('posts', …)` serves `/api/posts`) and never register module routes in `routes/api.php`. `routes/api.php` keeps the prefix `bootstrap/app.php` gives it.
+- `consistentapi.api_domain` (`null`: every host) limits module routes to one bare host such as `api.example.com`, without a scheme, port or `{parameter}`; elsewhere they answer 404. `ApiJsonMiddleware` and `hide_model_not_found` then apply to that host only. Domain and prefix work together: `null` + `api` is `/api/*` on any host, `api.example.com` + empty prefix is everything on that host (`https://api.example.com/posts`), `api.example.com` + `v1` is only `/v1/*` on that host. `routes/api.php` answers on every host. Behind a proxy the public host must be in the `Host` header: `ApiJsonMiddleware` runs before `TrustProxies` and does not see `X-Forwarded-Host`. Rebuild the route cache after changing it.
+- A catch-all route of the app such as `Route::get('/{any}', …)->where('any', '.*')` is registered before the module routes, and the first match wins. With `api_domain` unset it takes every API URL. A domain on the catch-all alone does not help, because Laravel checks routes with a domain first; use `Route::fallback()`, which only unknown URLs reach, those of the API included. With `api_domain` set the module routes are checked first, but unknown URLs of the API host still reach a catch-all without a domain instead of a JSON 404: put it in `Route::domain('example.com')->group(…)` with the domain of the site.
 - A folder named `Middleware` in the modules folder is skipped. A missing modules folder is not an error; an invalid `modules_folder` (empty, `..`, `my-modules`: every segment must be a PHP identifier) throws.
 - Migrations, factories and seeders stay in `database/`. `ConsistentModel` finds factories as `Database\Factories\{Model}Factory` and tells them which model they create; two modules with models of the same short name should use `#[UseFactory]`.
 
@@ -172,7 +174,7 @@ php artisan consistent:rebuild --rollback  # restore the files of the last run (
 - References are rewritten on the syntax tree in every PHP file of `app/`, `routes/`, `database/`, `tests/`, `config/`, `bootstrap/` (not `bootstrap/cache`): one-line and braced namespaces, group imports, relative names, names reached through the old namespace (an import is added), class name strings, comments and docblock types. A moved `HasFactory` model with `database/factories/{Model}Factory.php` gets `#[UseFactory]`.
 - Only whole top-level `Route::…` statements of `routes/api.php` that name controllers of one module move to its `Routes.php` (groups keep their middleware; every class they name is imported). Routes inside `if` or other statements, assignments and statements naming several modules stay, with new class names; comments stay comments.
 - Everything is computed and parsed in memory first: conflicting or existing destinations, an unparsable file naming a moved class, or an invalid result stop the run with exit code 1 before any write. A failed write puts every file back.
-- Not handled: class names stored in the database (polymorphic `*_type`, notifications, `personal_access_tokens.tokenable_type`, queued jobs) — the command prints a `Relation::morphMap([...])` mapping old names to new classes when the app has no morph map; Blade/JSON/other non-PHP files are only listed; afterwards run `composer dump-autoload` and `php artisan optimize:clear`. Moved routes get `consistentapi.api_url_prefix` / `middlewares` instead of the `bootstrap/app.php` settings of `routes/api.php`.
+- Not handled: class names stored in the database (polymorphic `*_type`, notifications, `personal_access_tokens.tokenable_type`, queued jobs) — the command prints a `Relation::morphMap([...])` mapping old names to new classes when the app has no morph map; Blade/JSON/other non-PHP files are only listed; afterwards run `composer dump-autoload` and `php artisan optimize:clear`. Moved routes get `consistentapi.api_url_prefix` / `api_domain` / `middlewares` instead of the `bootstrap/app.php` settings of `routes/api.php`.
 
 ## Config (`config/consistentapi.php`)
 
@@ -181,10 +183,11 @@ php artisan consistent:rebuild --rollback  # restore the files of the last run (
 | `modules_folder`   | `Modules`   | modules directory under `app/`                                       |
 | `request_limit`    | `60`        | requests per minute of the `api` rate limiter (per user id, else IP) |
 | `api_url_prefix`   | `api`       | prefix of module routes; also the scope of `ApiJsonMiddleware`       |
+| `api_domain`       | `null`      | host of module routes, also the scope of `ApiJsonMiddleware`; `null`: every host |
 | `middlewares`      | `['api']`   | middleware of every module route                                     |
 | `api_json_enabled` | `true`      | prepend `ApiJsonMiddleware` to the global middleware                 |
 | `without_wrapping` | `true`      | `JsonResource::withoutWrapping()` for every resource of the app      |
-| `hide_model_not_found` | `true`  | 404 `{"message": "Not found."}` instead of naming the model class (debug off, API prefix) |
+| `hide_model_not_found` | `true`  | 404 `{"message": "Not found."}` instead of naming the model class (debug off, API prefix and `api_domain`) |
 | `uuid`             | `true`      | allow `--uuid`                                                       |
 | `uuid_column`      | `public_id` | route key column of `--uuid` modules                                 |
 | `pagination`       | see below   | `data_container_name` (`items`), `meta_container_name` (`meta`), `per_page` (`[10, 15, 25, 50, 100]`), `unpaginated_limit` (`1000`) |
